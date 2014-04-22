@@ -1,0 +1,28 @@
+{
+  "name": "elliptic",
+  "version": "0.0.0",
+  "description": "EC cryptography",
+  "main": "lib/elliptic.js",
+  "scripts": {
+    "test": "mocha --reporter=spec test/*-test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:indutny/elliptic"
+  },
+  "keywords": [
+    "EC",
+    "Elliptic",
+    "curve",
+    "Cryptography"
+  ],
+  "author": "Fedor Indutny <fedor@indutny.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/indutny/elliptic/issues"
+  },
+  "homepage": "https://github.com/indutny/elliptic",
+  "devDependencies": {
+    "mocha": "^1.18.2"
+  }
+}
