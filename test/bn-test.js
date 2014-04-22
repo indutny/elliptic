@@ -9,11 +9,15 @@ describe('BN', function() {
   it('should work with String input', function() {
     assert.equal(elliptic.bn('29048849665247').toString(16),
                  '1a6b765d8cdf');
+    assert.equal(elliptic.bn('-29048849665247').toString(16),
+                 '-1a6b765d8cdf');
     assert.equal(elliptic.bn('1A6B765D8CDF', 16).toString(16),
                  '1a6b765d8cdf');
     assert.equal(elliptic.bn('FF', 16).toString(), '255');
     assert.equal(elliptic.bn('1A6B765D8CDF', 16).toString(),
                  '29048849665247');
+    assert.equal(elliptic.bn('a89c e5af8724 c0a23e0e 0ff77500', 16).toString(16),
+                 'a89ce5af8724c0a23e0e0ff77500');
   });
 
   it('should add numbers', function() {
@@ -25,15 +29,26 @@ describe('BN', function() {
     assert.equal(r.toString(16), '125868');
   });
 
-  it('should substract numbers', function() {
+  it('should subtract numbers', function() {
     assert.equal(elliptic.bn(14).sub(26).toString(16), '-c');
     assert.equal(elliptic.bn(26).sub(14).toString(16), 'c');
     assert.equal(elliptic.bn(26).sub(26).toString(16), '0');
     assert.equal(elliptic.bn(-26).sub(26).toString(16), '-34');
+
+    var a = '31ff3c61db2db84b9823d320907a573f6ad37c437abe458b1802cda041d6384' +
+            'a7d8daef41395491e2';
+    var b = '6f0e4d9f1d6071c183677f601af9305721c91d31b0bbbae8fb790000';
+    var r = '31ff3c61db2db84b9823d3208989726578fd75276287cd9516533a9acfb9a67' +
+            '76281f34583ddb91e2';
+    assert.equal(elliptic.bn(a, 16).sub(b, 16).toString(16), r);
   });
 
   it('should mul numbers', function() {
     assert.equal(elliptic.bn(0x1001).mul(0x1234).toString(16),
+                 '1235234');
+    assert.equal(elliptic.bn(-0x1001).mul(0x1234).toString(16),
+                 '-1235234');
+    assert.equal(elliptic.bn(-0x1001).mul(-0x1234).toString(16),
                  '1235234');
     var n = elliptic.bn(0x1001);
     var r = n;
@@ -41,6 +56,15 @@ describe('BN', function() {
       r = r.mul(n);
     assert.equal(r.toString(16),
                  '100500a00a005001');
+
+    var n = elliptic.bn(
+      '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      16
+    );
+    assert.equal(n.mul(n).toString(16),
+                 '39e58a8055b6fb264b75ec8c646509784204ac15a8c24e05babc9729ab9' +
+                     'b055c3a9458e4ce3289560a38e08ba8175a9446ce14e608245ab3a9' +
+                     '978a8bd8acaa40');
   });
 
   it('should div numbers', function() {
@@ -48,6 +72,18 @@ describe('BN', function() {
                  '0');
     assert.equal(elliptic.bn('69527932928').div('16974594').toString(16),
                  'fff');
+    assert.equal(elliptic.bn('-69527932928').div('16974594').toString(16),
+                 '-fff');
+
+    var b = elliptic.bn(
+      '39e58a8055b6fb264b75ec8c646509784204ac15a8c24e05babc9729ab9' +
+          'b055c3a9458e4ce3289560a38e08ba8175a9446ce14e608245ab3a9' +
+          '978a8bd8acaa40', 16);
+    var n = elliptic.bn(
+      '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      16
+    );
+    assert.equal(b.div(n).toString(16), n.toString(16));
   });
 
   it('should mod numbers', function() {
@@ -55,6 +91,8 @@ describe('BN', function() {
                  'a');
     assert.equal(elliptic.bn('69527932928').mod('16974594').toString(16),
                  '102f302');
+    assert.equal(elliptic.bn('-69527932928').mod('16974594').toString(16),
+                 '-102f302');
   });
 
   it('should shl numbers', function() {
