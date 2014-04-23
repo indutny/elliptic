@@ -16,7 +16,7 @@ describe('Curve', function() {
     assert(p.dbl().validate());
     assert(p.dbl().add(p).validate());
     assert(p.dbl().add(p.dbl(p)).validate());
-    assert(p.dbl().add(p.dbl(p)).eq(p.add(p).add(p).add(p).add(p)));
+    assert(p.dbl().add(p.dbl(p)).eq(p.add(p).add(p).add(p)));
   });
 
   it('should work with secp112k1', function() {
@@ -47,6 +47,7 @@ describe('Curve', function() {
     );
     assert(p.validate());
     assert(p.dbl().validate());
-    assert(p.mul(65535).validate());
+    assert(p.toJ().dbl().toP().validate());
+    assert(p.mul('79be667e f9dcbbac 55a06295 ce870b07').validate());
   });
 });
