@@ -12,10 +12,10 @@ describe('ECDSA', function() {
 
     // Sign and verify
     var signature = ecdsa.sign(msg, keys.priv);
-    assert(ecdsa.verify(msg, keys.pub));
+    assert(ecdsa.verify(msg, signature, keys.pub));
 
     // Wrong public key
     var keys = ecdsa.genKeyPair();
-    assert(!ecdsa.verify(msg, keys.pub));
+    assert(!ecdsa.verify(msg, signature, keys.pub));
   });
 });
