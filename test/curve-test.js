@@ -47,5 +47,6 @@ describe('Curve', function() {
     );
     assert(p.validate());
     assert(p.dbl().validate());
+    assert(p.mul(65535).validate());
   });
 });
