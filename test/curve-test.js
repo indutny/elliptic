@@ -9,7 +9,6 @@ describe('Curve', function() {
       b: '14'
     });
 
-    // Compressed form
     var p = curve.point(
       '18',
       '16');
@@ -27,7 +26,6 @@ describe('Curve', function() {
       b: '659e f8ba0439 16eede89 11702b22'
     });
 
-    // Compressed form
     var p = curve.point(
       '0948 7239995a 5ee76b55 f9c2f098',
       'a89c e5af8724 c0a23e0e 0ff77500');
@@ -43,7 +41,6 @@ describe('Curve', function() {
       b: '7'
     });
 
-    // Compressed form
     var p = curve.point(
       '79be667e f9dcbbac 55a06295 ce870b07 029bfcdb 2dce28d9 59f2815b 16f81798',
       '483ada77 26a3c465 5da4fbfc 0e1108a8 fd17b448 a6855419 9c47d08f fb10d4b8'
