@@ -92,7 +92,7 @@ describe('BN', function() {
     assert.equal(elliptic.bn('69527932928').mod('16974594').toString(16),
                  '102f302');
     assert.equal(elliptic.bn('-69527932928').mod('16974594').toString(16),
-                 '-102f302');
+                 '1000');
   });
 
   it('should shl numbers', function() {
@@ -107,5 +107,19 @@ describe('BN', function() {
                  '818180');
     assert.equal(elliptic.bn('69527932928').shr(17).toString(16),
                  '81818');
+  });
+
+  it('should invm numbers', function() {
+    var p = elliptic.bn(257);
+    var a = elliptic.bn(3);
+    var b = a.invm(p);
+    assert.equal(a.mul(b).mod(p).toString(16), '1');
+
+    var p192 = elliptic.bn(
+        'fffffffffffffffffffffffffffffffeffffffffffffffff',
+        16);
+    var a = elliptic.bn('deadbeef', 16);
+    var b = a.invm(p192);
+    assert.equal(a.mul(b).mod(p192).toString(16), '1');
   });
 });
