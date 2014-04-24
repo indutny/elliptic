@@ -9,9 +9,7 @@ describe('Curve', function() {
       b: '14'
     });
 
-    var p = curve.point(
-      '18',
-      '16');
+    var p = curve.point('18', '16');
     assert(p.validate());
     assert(p.dbl().validate());
     assert(p.dbl().add(p).validate());
