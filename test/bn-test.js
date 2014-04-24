@@ -122,4 +122,15 @@ describe('BN', function() {
     var b = a.invm(p192);
     assert.equal(a.mul(b).mod(p192).toString(16), '1');
   });
+
+  it('should support montgomery operations', function() {
+    var p192 = elliptic.bn(
+        'fffffffffffffffffffffffffffffffeffffffffffffffff',
+        16);
+    var m = elliptic.bn.mont(p192);
+    var a = elliptic.bn(123);
+    var b = elliptic.bn(231);
+    var c = a.toMont(m).montMul(b.toMont(m)).fromMont();
+    assert(c.cmp(a.mul(b).mod(p192)) === 0);
+  });
 });
