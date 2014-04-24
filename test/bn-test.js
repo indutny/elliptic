@@ -123,6 +123,12 @@ describe('BN', function() {
     assert.equal(a.mul(b).mod(p192).toString(16), '1');
   });
 
+  it('should support binc', function() {
+    assert.equal(elliptic.bn(0).binc(1).toString(16), '2');
+    assert.equal(elliptic.bn(2).binc(1).toString(16), '4');
+    assert.equal(elliptic.bn(0xffffff).binc(1).toString(16), '1000001');
+  });
+
   it('should support montgomery operations', function() {
     var p192 = elliptic.bn(
         'fffffffffffffffffffffffffffffffeffffffffffffffff',
