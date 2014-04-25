@@ -1,5 +1,6 @@
 var assert = require('assert');
 var elliptic = require('../');
+var hash = require('hash.js');
 
 describe('ECDSA', function() {
   it('should work with secp256k1 NIST curve', function() {
@@ -52,25 +53,25 @@ describe('ECDSA', function() {
       cases: [
         {
           message: 'sample',
-          hash: elliptic.hash.sha224,
+          hash: hash.sha224,
           r: 'a1f00dad97aeec91c95585f36200c65f3c01812aa60378f5',
           s: 'e07ec1304c7c6c9debbe980b9692668f81d4de7922a0f97a'
         },
         {
           message: 'sample',
-          hash: elliptic.hash.sha256,
+          hash: hash.sha256,
           r: '4b0b8ce98a92866a2820e20aa6b75b56382e0f9bfd5ecb55',
           s: 'ccdb006926ea9565cbadc840829d8c384e06de1f1e381b85'
         },
         {
           message: 'test',
-          hash: elliptic.hash.sha224,
+          hash: hash.sha224,
           r: '6945a1c1d1b2206b8145548f633bb61cef04891baf26ed34',
           s: 'b7fb7fdfc339c0b9bd61a9f5a8eaf9be58fc5cba2cb15293'
         },
         {
           message: 'test',
-          hash: elliptic.hash.sha256,
+          hash: hash.sha256,
           r: '3a718bd8b4926c3b52ee6bbe67ef79b18cb6eb62b1ad97ae',
           s: '5662e6848a4a19b1f1ae2f72acd4b8bbe50f1eac65d9124f'
         }
@@ -88,25 +89,25 @@ describe('ECDSA', function() {
       cases: [
         {
           message: 'sample',
-          hash: elliptic.hash.sha224,
+          hash: hash.sha224,
           r: '1cdfe6662dde1e4a1ec4cdedf6a1f5a2fb7fbd9145c12113e6abfd3e',
           s: 'a6694fd7718a21053f225d3f46197ca699d45006c06f871808f43ebc'
         },
         {
           message: 'sample',
-          hash: elliptic.hash.sha256,
+          hash: hash.sha256,
           r: '61aa3da010e8e8406c656bc477a7a7189895e7e840cdfe8ff42307ba',
           s: 'bc814050dab5d23770879494f9e0a680dc1af7161991bde692b10101'
         },
         {
           message: 'test',
-          hash: elliptic.hash.sha224,
+          hash: hash.sha224,
           r: 'c441ce8e261ded634e4cf84910e4c5d1d22c5cf3b732bb204dbef019',
           s: '902f42847a63bdc5f6046ada114953120f99442d76510150f372a3f4'
         },
         {
           message: 'test',
-          hash: elliptic.hash.sha256,
+          hash: hash.sha256,
           r: 'ad04dde87b84747a243a631ea47a1ba6d1faa059149ad2440de6fba6',
           s: '178d49b1ae90e3d8b629be3db5683915f4e8c99fdf6e666cf37adcfd'
         }
@@ -124,25 +125,25 @@ describe('ECDSA', function() {
       cases: [
         {
           message: 'sample',
-          hash: elliptic.hash.sha224,
+          hash: hash.sha224,
           r: '53b2fff5d1752b2c689df257c04c40a587fababb3f6fc2702f1343af7ca9aa3f',
           s: 'b9afb64fdc03dc1a131c7d2386d11e349f070aa432a4acc918bea988bf75c74c'
         },
         {
           message: 'sample',
-          hash: elliptic.hash.sha256,
+          hash: hash.sha256,
           r: 'efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716',
           s: 'f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8'
         },
         {
           message: 'test',
-          hash: elliptic.hash.sha224,
+          hash: hash.sha224,
           r: 'c37edb6f0ae79d47c3c27e962fa269bb4f441770357e114ee511f662ec34a692',
           s: 'c820053a05791e521fcaad6042d40aea1d6b1a540138558f47d0719800e18f2d'
         },
         {
           message: 'test',
-          hash: elliptic.hash.sha256,
+          hash: hash.sha256,
           r: 'f1abb023518351cd71d881567b1ea663ed3efcf6c5132b354f28d3b0b7d38367',
           s: '19f4113742a2b14bd25926b49c649155f267e60d3814b4c0cc84250e46f0083'
         }

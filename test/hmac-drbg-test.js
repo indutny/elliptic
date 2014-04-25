@@ -1,12 +1,13 @@
 var assert = require('assert');
 var elliptic = require('../');
 var utils = elliptic.utils;
+var hash = require('hash.js');
 
 describe('Hmac_DRBG', function() {
   it('should support hmac-drbg-sha256', function() {
     function doDrbg(opt) {
       var drbg = elliptic.hmacDRBG({
-        hash: elliptic.hash.sha256,
+        hash: hash.sha256,
         entropy: opt.entropy,
         nonce: opt.nonce,
         pers: opt.pers
@@ -38,7 +39,7 @@ describe('Hmac_DRBG', function() {
     function test(opt) {
       it('should not fail at ' + opt.name, function() {
         var drbg = elliptic.hmacDRBG({
-          hash: elliptic.hash.sha256,
+          hash: hash.sha256,
           entropy: opt.entropy,
           entropyEnc: 'hex',
           nonce: opt.nonce,
