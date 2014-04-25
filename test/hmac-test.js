@@ -4,12 +4,6 @@ var utils = elliptic.utils;
 
 describe('Hmac', function() {
   it('should support hmac-sha256', function() {
-    function hmac(opt) {
-      return elliptic.hmac(elliptic.hash.sha256, opt.key, 'hex')
-                     .update(opt.msg)
-                     .digest('hex');
-    }
-
     var test = [
       {
         key: '00010203 04050607 08090A0B 0C0D0E0F' +
@@ -41,7 +35,14 @@ describe('Hmac', function() {
         res: '27a8b157839efeac98df070b331d593618ddb985d403c0c786d23b5d132e57c7'
       }
     ];
-    for (var i = 0; i < test.length; i++)
-      assert.equal(hmac(test[i]), test[i].res);
+    for (var i = 0; i < test.length; i++) {
+      var opt = test[i];
+      var h = elliptic.hmac(elliptic.hash.sha256, opt.key, 'hex');
+      assert.equal(h.update(opt.msg).digest('hex'), opt.res);
+      var h = elliptic.hmac(elliptic.hash.sha256, opt.key, 'hex');
+      assert.equal(h.update(opt.msg.slice(0, 10))
+                    .update(opt.msg.slice(10))
+                    .digest('hex'), opt.res);
+    }
   });
 });
