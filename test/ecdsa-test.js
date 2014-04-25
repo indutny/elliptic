@@ -28,18 +28,30 @@ describe('ECDSA', function() {
         });
 
         var dgst = opt.hash().update(opt.message).digest();
-        console.log(ecdsa.sign(dgst, opt.key));
+        var sign = ecdsa.sign(dgst, opt.key);
+        assert.equal(sign.r.toString(16), opt.r);
+        assert.equal(sign.s.toString(16), opt.s);
       });
     }
 
     test({
-      name: 'ECDSA, 192 Bits (Prime Field)',
+      name: 'ECDSA, 192 Bits (Prime Field): sample',
       curve: elliptic.nist.p192,
       hash: elliptic.hash.sha256,
       message: 'sample',
       key: '6fab034934e4c0fc9ae67f5b5659a9d7d1fefd187ee09fd4',
       r: '4b0b8ce98a92866a2820e20aa6b75b56382e0f9bfd5ecb55',
       s: 'ccdb006926ea9565cbadc840829d8c384e06de1f1e381b85'
+    });
+
+    test({
+      name: 'ECDSA, 192 Bits (Prime Field): test',
+      curve: elliptic.nist.p192,
+      hash: elliptic.hash.sha256,
+      message: 'test',
+      key: '6fab034934e4c0fc9ae67f5b5659a9d7d1fefd187ee09fd4',
+      r: '3a718bd8b4926c3b52ee6bbe67ef79b18cb6eb62b1ad97ae',
+      s: '5662e6848a4a19b1f1ae2f72acd4b8bbe50f1eac65d9124f'
     });
   });
 });
