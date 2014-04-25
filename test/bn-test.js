@@ -21,7 +21,9 @@ describe('BN', function() {
   });
 
   it('should import/export big endian', function() {
+    assert.equal(elliptic.bn([1,2,3]).toString(16), '10203');
     assert.equal(elliptic.bn([1,2,3,4]).toString(16), '1020304');
+    assert.equal(elliptic.bn([1,2,3,4,5]).toString(16), '102030405');
     assert.equal(elliptic.bn([1,2,3,4]).toArray().join(','), '1,2,3,4');
   });
 
