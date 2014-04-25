@@ -20,6 +20,11 @@ describe('BN', function() {
                  'a89ce5af8724c0a23e0e0ff77500');
   });
 
+  it('should import/export big endian', function() {
+    assert.equal(elliptic.bn([1,2,3,4]).toString(16), '1020304');
+    assert.equal(elliptic.bn([1,2,3,4]).toArray().join(','), '1,2,3,4');
+  });
+
   it('should add numbers', function() {
     assert.equal(elliptic.bn(14).add(26).toString(16), '28');
     var k = elliptic.bn(0x1234);
