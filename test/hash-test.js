@@ -35,4 +35,38 @@ describe('Hash', function() {
       assert.equal(hash, res);
     }
   });
+
+  it('should support sha224', function() {
+    function hash(msg, enc) {
+      return elliptic.hash.sha224().update(msg, enc).digest('hex');
+    }
+
+    assert.equal(elliptic.hash.sha224.blockSize, 512);
+    assert.equal(elliptic.hash.sha224.outSize, 224);
+
+    var test = [
+      [ 'abc',
+        '23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7' ],
+      [ 'abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq',
+        '75388b16512776cc5dba5da1fd890150b0c6455cb4f58b1952522525' ],
+      [ 'deadbeef',
+        '55b9eee5f60cc362ddc07676f620372611e22272f60fdbec94f243f8',
+        'hex' ],
+    ];
+    for (var i = 0; i < test.length; i++) {
+      var msg = test[i][0];
+      var res = test[i][1];
+      var enc = test[i][2];
+
+      var hash = elliptic.hash.sha224().update(msg, enc).digest('hex');
+      assert.equal(hash, res);
+
+      // Split message
+      var hash = elliptic.hash.sha224()
+                         .update(msg.slice(0, 2), enc)
+                         .update(msg.slice(2), enc)
+                         .digest('hex');
+      assert.equal(hash, res);
+    }
+  });
 });
