@@ -21,37 +21,93 @@ describe('ECDSA', function() {
 
   describe('RFC6979 vector', function() {
     function test(opt) {
-      it('should not fail on "' + opt.name + '"', function() {
-        var ecdsa = elliptic.ecdsa({
-          curve: opt.curve,
-          hash: opt.hash
-        });
+      var ecdsa = elliptic.ecdsa({
+        curve: opt.curve,
+        hash: opt.hash
+      });
 
-        var dgst = opt.hash().update(opt.message).digest();
-        var sign = ecdsa.sign(dgst, opt.key);
-        assert.equal(sign.r.toString(16), opt.r);
-        assert.equal(sign.s.toString(16), opt.s);
+      opt.cases.forEach(function(c) {
+        it('should not fail on "' + opt.name + '" : "' + c.message + '"',
+           function() {
+          var dgst = opt.hash().update(c.message).digest();
+          var sign = ecdsa.sign(dgst, opt.key);
+          assert.equal(sign.r.toString(16), c.r);
+          assert.equal(sign.s.toString(16), c.s);
+          assert.ok(ecdsa.validateKey(opt.pub),
+                    'Invalid public key');
+          assert.ok(ecdsa.verify(dgst, sign, opt.pub),
+                    'Invalid signature');
+        });
       });
     }
 
     test({
-      name: 'ECDSA, 192 Bits (Prime Field): sample',
+      name: 'ECDSA, 192 Bits (Prime Field)',
       curve: elliptic.nist.p192,
       hash: elliptic.hash.sha256,
-      message: 'sample',
       key: '6fab034934e4c0fc9ae67f5b5659a9d7d1fefd187ee09fd4',
-      r: '4b0b8ce98a92866a2820e20aa6b75b56382e0f9bfd5ecb55',
-      s: 'ccdb006926ea9565cbadc840829d8c384e06de1f1e381b85'
+      pub: {
+        x: 'ac2c77f529f91689fea0ea5efec7f210d8eea0b9e047ed56',
+        y: '3bc723e57670bd4887ebc732c523063d0a7c957bc97c1c43'
+      },
+      cases: [
+        {
+          message: 'sample',
+          r: '4b0b8ce98a92866a2820e20aa6b75b56382e0f9bfd5ecb55',
+          s: 'ccdb006926ea9565cbadc840829d8c384e06de1f1e381b85'
+        },
+        {
+          message: 'test',
+          r: '3a718bd8b4926c3b52ee6bbe67ef79b18cb6eb62b1ad97ae',
+          s: '5662e6848a4a19b1f1ae2f72acd4b8bbe50f1eac65d9124f'
+        }
+      ],
     });
 
     test({
-      name: 'ECDSA, 192 Bits (Prime Field): test',
-      curve: elliptic.nist.p192,
+      name: 'ECDSA, 224 Bits (Prime Field)',
+      curve: elliptic.nist.p224,
       hash: elliptic.hash.sha256,
-      message: 'test',
-      key: '6fab034934e4c0fc9ae67f5b5659a9d7d1fefd187ee09fd4',
-      r: '3a718bd8b4926c3b52ee6bbe67ef79b18cb6eb62b1ad97ae',
-      s: '5662e6848a4a19b1f1ae2f72acd4b8bbe50f1eac65d9124f'
+      key: 'f220266e1105bfe3083e03ec7a3a654651f45e37167e88600bf257c1',
+      pub: {
+        x: '00cf08da5ad719e42707fa431292dea11244d64fc51610d94b130d6c',
+        y: 'eeab6f3debe455e3dbf85416f7030cbd94f34f2d6f232c69f3c1385a'
+      },
+      cases: [
+        {
+          message: 'sample',
+          r: '61aa3da010e8e8406c656bc477a7a7189895e7e840cdfe8ff42307ba',
+          s: 'bc814050dab5d23770879494f9e0a680dc1af7161991bde692b10101'
+        },
+        {
+          message: 'test',
+          r: 'ad04dde87b84747a243a631ea47a1ba6d1faa059149ad2440de6fba6',
+          s: '178d49b1ae90e3d8b629be3db5683915f4e8c99fdf6e666cf37adcfd'
+        }
+      ],
+    });
+
+    test({
+      name: 'ECDSA, 256 Bits (Prime Field)',
+      curve: elliptic.nist.p256,
+      hash: elliptic.hash.sha256,
+      key: 'c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721',
+      pub: {
+        x: '60fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb6',
+        y: '7903fe1008b8bc99a41ae9e95628bc64f2f1b20c2d7e9f5177a3c294d4462299'
+      },
+      cases: [
+        {
+          message: 'sample',
+          r: 'efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716',
+          s: 'f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8'
+        },
+        {
+          message: 'test',
+          r: 'f1abb023518351cd71d881567b1ea663ed3efcf6c5132b354f28d3b0b7d38367',
+          s: '19f4113742a2b14bd25926b49c649155f267e60d3814b4c0cc84250e46f0083'
+        }
+      ],
     });
   });
 });
