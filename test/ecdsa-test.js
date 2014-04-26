@@ -12,12 +12,18 @@ describe('ECDSA', function() {
     var msg = 'deadbeef';
 
     // Sign and verify
-    var signature = ecdsa.sign(msg, keys.priv);
-    assert(ecdsa.verify(msg, signature, keys.pub));
+    var signature = ecdsa.sign(msg, keys);
+    assert(ecdsa.verify(msg, signature, keys), 'Normal verify');
+
+    // DER encoding
+    var dsign = signature.toDER('hex');
+    assert(ecdsa.verify(msg, dsign, keys), 'hex-DER encoded verify');
+    var dsign = signature.toDER();
+    assert(ecdsa.verify(msg, dsign, keys), 'DER encoded verify');
 
     // Wrong public key
     var keys = ecdsa.genKeyPair();
-    assert(!ecdsa.verify(msg, signature, keys.pub));
+    assert(!ecdsa.verify(msg, signature, keys), 'Wrong key verify');
   });
 
   describe('RFC6979 vector', function() {
@@ -34,7 +40,7 @@ describe('ECDSA', function() {
           var sign = ecdsa.sign(dgst, opt.key);
           assert.equal(sign.r.toString(16), c.r);
           assert.equal(sign.s.toString(16), c.s);
-          assert.ok(ecdsa.validateKey(opt.pub),
+          assert.ok(ecdsa.keyPair(opt.pub).validate().result,
                     'Invalid public key');
           assert.ok(ecdsa.verify(dgst, sign, opt.pub),
                     'Invalid signature');
