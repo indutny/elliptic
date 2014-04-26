@@ -27,6 +27,6 @@
     "mocha": "^1.18.2"
   },
   "dependencies": {
-    "hash.js": "^0.1.0"
+    "hash.js": "^0.2.0"
   }
 }
