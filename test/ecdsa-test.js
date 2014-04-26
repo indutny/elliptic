@@ -11,6 +11,12 @@ describe('ECDSA', function() {
     var keys = ecdsa.genKeyPair();
     var msg = 'deadbeef';
 
+    // Get keys out of pair
+    assert(keys.getPublic().x && keys.getPublic().y);
+    assert(keys.getPrivate().length > 0);
+    assert(keys.getPublic('hex').length > 0);
+    assert(keys.getPrivate('hex').length > 0);
+
     // Sign and verify
     var signature = ecdsa.sign(msg, keys);
     assert(ecdsa.verify(msg, signature, keys), 'Normal verify');
