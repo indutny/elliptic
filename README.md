@@ -1,4 +1,4 @@
-# Elliptic
+# Elliptic [![Build Status](https://secure.travis-ci.org/indutny/elliptic.png)](http://travis-ci.org/indutny/elliptic)
 
 Just a bike-shed.
 
