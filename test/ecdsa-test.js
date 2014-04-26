@@ -9,7 +9,7 @@ describe('ECDSA', function() {
 
     var ecdsa = new elliptic.ecdsa(curve);
     var keys = ecdsa.genKeyPair();
-    var msg = new elliptic.bn('deadbeef', 16);
+    var msg = 'deadbeef';
 
     // Sign and verify
     var signature = ecdsa.sign(msg, keys.priv);
