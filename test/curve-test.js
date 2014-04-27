@@ -13,8 +13,8 @@ describe('Curve', function() {
     assert(p.validate());
     assert(p.dbl().validate());
     assert(p.dbl().add(p).validate());
-    assert(p.dbl().add(p.dbl(p)).validate());
-    assert(p.dbl().add(p.dbl(p)).eq(p.add(p).add(p).add(p)));
+    assert(p.dbl().add(p.dbl()).validate());
+    assert(p.dbl().add(p.dbl()).eq(p.add(p).add(p).add(p)));
   });
 
   it('should work with secp112k1', function() {
