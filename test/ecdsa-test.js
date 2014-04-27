@@ -21,6 +21,14 @@ describe('ECDSA', function() {
     var signature = ecdsa.sign(msg, keys);
     assert(ecdsa.verify(msg, signature, keys), 'Normal verify');
 
+    // Load private key from hex
+    var keys = ecdsa.keyPair(keys.getPrivate('hex'), 'hex');
+    var signature = ecdsa.sign(msg, keys);
+    assert(ecdsa.verify(msg, signature, keys), 'hex-private verify');
+
+    // Load public key from hex
+    var keys = ecdsa.keyPair(keys.getPublic('hex'), 'hex');
+
     // DER encoding
     var dsign = signature.toDER('hex');
     assert(ecdsa.verify(msg, dsign, keys), 'hex-DER encoded verify');
