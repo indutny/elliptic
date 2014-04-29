@@ -26,6 +26,9 @@ describe('ECDSA', function() {
     var signature = ecdsa.sign(msg, keys);
     assert(ecdsa.verify(msg, signature, keys), 'hex-private verify');
 
+    // Load public key from compact hex
+    var keys = ecdsa.keyPair(keys.getPublic(true, 'hex'), 'hex');
+
     // Load public key from hex
     var keys = ecdsa.keyPair(keys.getPublic('hex'), 'hex');
 
