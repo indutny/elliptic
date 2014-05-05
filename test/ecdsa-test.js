@@ -173,4 +173,18 @@ describe('ECDSA', function() {
       ],
     });
   });
+
+  it('should deterministically generate private key', function() {
+    var curve = elliptic.nist.secp256k1;
+    assert(curve);
+
+    var ecdsa = new elliptic.ecdsa(curve);
+    var keys = ecdsa.genKeyPair({
+      pers: 'my.pers.string',
+      entropy: hash.sha256().update('hello world').digest()
+    });
+    assert.equal(
+      keys.getPrivate('hex'),
+      'c381628be281b2e35e913fc3a2e8ac3867eae90e5ad9d0d7a2e4af90cee92787');
+  });
 });
