@@ -8,7 +8,9 @@ describe('ECDSA', function() {
     assert(curve);
 
     var ecdsa = new elliptic.ecdsa(curve);
-    var keys = ecdsa.genKeyPair();
+    var keys = ecdsa.genKeyPair({
+      entropy: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25 ]
+    });
     var msg = 'deadbeef';
 
     // Get keys out of pair
@@ -16,6 +18,7 @@ describe('ECDSA', function() {
     assert(keys.getPrivate().length > 0);
     assert(keys.getPublic('hex').length > 0);
     assert(keys.getPrivate('hex').length > 0);
+    assert(keys.validate().result);
 
     // Sign and verify
     var signature = ecdsa.sign(msg, keys);
