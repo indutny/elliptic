@@ -1,0 +1,16 @@
+{
+  "name": "bn.js-benchmark",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "benchmark": "^1.0.0",
+    "eccjs": "^0.3.1",
+    "sjcl": "^1.0.1"
+  }
+}
