@@ -188,6 +188,6 @@ describe('ECDSA', function() {
     });
     assert.equal(
       keys.getPrivate('hex'),
-      'c381628be281b2e35e913fc3a2e8ac3867eae90e5ad9d0d7a2e4af90cee92787');
+      '6160edb2b218b7f1394b9ca8eb65a72831032a1f2f3dc2d99291c2f7950ed887');
   });
 });
