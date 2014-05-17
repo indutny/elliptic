@@ -5,6 +5,7 @@ var elliptic = require('../');
 var eccjs = require('eccjs');
 
 var benchmarks = [];
+var maxTime = 10;
 
 function add(op, a, b, c) {
   benchmarks.push({
@@ -14,8 +15,8 @@ function add(op, a, b, c) {
 
       console.log('Benchmarking: ' + op);
       suite
-        .add('elliptic#' + op, a)
-        .add('eccjs#' + op, b)
+        .add('elliptic#' + op, a, { maxTime: maxTime })
+        .add('eccjs#' + op, b, { maxTime: maxTime })
         .on('cycle', function(event) {
           console.log(String(event.target));
         })
