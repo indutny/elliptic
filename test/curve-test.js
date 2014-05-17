@@ -48,5 +48,8 @@ describe('Curve', function() {
     assert(p.dbl().validate());
     assert(p.toJ().dbl().toP().validate());
     assert(p.mul(new bn('79be667e f9dcbbac 55a06295 ce870b07', 16)).validate());
+
+    var j = p.toJ();
+    assert(j.trpl().eq(j.dbl().add(j)));
   });
 });
