@@ -66,4 +66,10 @@ add('verify', function() {
   k2.pub.verify(m2, s2);
 });
 
+add('gen', function() {
+  c1.genKeyPair().getPublic();
+}, function() {
+  eccjs.sjcl.ecc.ecdsa.generateKeys(c2, 0);
+});
+
 start();
