@@ -14,9 +14,12 @@ function add(op, a, b, c) {
       var suite = new benchmark.Suite;
 
       console.log('Benchmarking: ' + op);
+      if (a)
+        suite.add('elliptic#' + op, a, { maxTime: maxTime })
+      if (b)
+        suite.add('eccjs#' + op, b, { maxTime: maxTime })
+
       suite
-        .add('elliptic#' + op, a, { maxTime: maxTime })
-        .add('eccjs#' + op, b, { maxTime: maxTime })
         .on('cycle', function(event) {
           console.log(String(event.target));
         })

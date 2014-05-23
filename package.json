@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "bn.js": "^0.10.0",
-    "hash.js": "^0.2.0"
+    "hash.js": "^0.2.0",
+    "uglify-js": "^2.4.13"
   }
 }
