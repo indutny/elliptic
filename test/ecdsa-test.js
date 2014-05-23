@@ -44,6 +44,11 @@ describe('ECDSA', function() {
     // Wrong public key
     var keys = ecdsa.genKeyPair();
     assert(!ecdsa.verify(msg, signature, keys), 'Wrong key verify');
+
+    // Invalid private key
+    var keys = ecdsa.keyPair(keys.getPrivate('hex') + keys.getPrivate('hex'),
+                             'hex');
+    assert(!ecdsa.verify(msg, signature, keys), 'Wrong key verify');
   });
 
   describe('RFC6979 vector', function() {
