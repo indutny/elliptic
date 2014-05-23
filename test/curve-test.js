@@ -37,7 +37,9 @@ describe('Curve', function() {
       p: 'ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff fffffffe ' +
              'fffffc2f',
       a: '0',
-      b: '7'
+      b: '7',
+      n: 'ffffffff ffffffff ffffffff fffffffe ' +
+             'baaedce6 af48a03b bfd25e8c d0364141'
     });
 
     var p = curve.point(
@@ -51,5 +53,20 @@ describe('Curve', function() {
 
     var j = p.toJ();
     assert(j.trpl().eq(j.dbl().add(j)));
+
+    // Endomorphism test
+    assert(curve.endo);
+    assert.equal(
+      curve.endo.beta.fromRed().toString(16),
+      '7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee');
+    assert.equal(
+      curve.endo.lambda.toString(16),
+      '5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72');
+
+    var k = new bn('1234567890123456789012345678901234', 16);
+    var split = curve._endoSplit(k);
+    assert.equal(
+      split.k1.add(split.k2.mul(curve.endo.lambda)).mod(curve.n).toString(16),
+      k.toString(16));
   });
 });
