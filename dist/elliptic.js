@@ -1436,6 +1436,10 @@ KeyPair.prototype.getPrivate = function getPrivate(enc) {
 
 KeyPair.prototype._importPrivate = function _importPrivate(key) {
   this.priv = new bn(key, 16);
+
+  // Ensure that the priv won't be bigger than n, otherwise we may fail
+  // in fixed multiplication method
+  this.priv = this.priv.mod(this.ecdsa.n);
 };
 
 KeyPair.prototype._importPublic = function _importPublic(key) {
@@ -5905,7 +5909,7 @@ if (typeof Object.create === 'function') {
 },{}],22:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
