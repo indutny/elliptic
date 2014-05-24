@@ -4,7 +4,7 @@ var elliptic = require('../');
 
 describe('Curve', function() {
   it('should work with example curve', function() {
-    var curve = new elliptic.curve({
+    var curve = new elliptic.curve.short({
       p: '1d',
       a: '4',
       b: '14'
@@ -19,7 +19,7 @@ describe('Curve', function() {
   });
 
   it('should work with secp112k1', function() {
-    var curve = new elliptic.curve({
+    var curve = new elliptic.curve.short({
       p: 'db7c 2abf62e3 5e668076 bead208b',
       a: 'db7c 2abf62e3 5e668076 bead2088',
       b: '659e f8ba0439 16eede89 11702b22'
@@ -33,7 +33,7 @@ describe('Curve', function() {
   });
 
   it('should work with secp256k1', function() {
-    var curve = new elliptic.curve({
+    var curve = new elliptic.curve.short({
       p: 'ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff fffffffe ' +
              'fffffc2f',
       a: '0',

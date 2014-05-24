@@ -29,6 +29,7 @@
   "dependencies": {
     "bn.js": "^0.10.1",
     "hash.js": "^0.2.0",
+    "inherits": "^2.0.1",
     "uglify-js": "^2.4.13"
   }
 }
