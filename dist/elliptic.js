@@ -2997,7 +2997,6 @@ BN.prototype._countBits = function _countBits(w) {
 
 // Return number of used bits in a BN
 BN.prototype.bitLength = function bitLength() {
-  this.strip();
   var hi = 0;
   var w = this.words[this.length - 1];
   var hi = this._countBits(w);
@@ -3005,7 +3004,6 @@ BN.prototype.bitLength = function bitLength() {
 };
 
 BN.prototype.byteLength = function byteLength() {
-  this.strip();
   var hi = 0;
   var w = this.words[this.length - 1];
   return Math.ceil(this.bitLength() / 8);
@@ -3076,10 +3074,17 @@ BN.prototype.iadd = function iadd(num) {
 
 // Add `num` to `this`
 BN.prototype.add = function add(num) {
-  if (num.sign && !this.sign)
-    return this.sub(num.neg());
-  else if (!num.sign && this.sign)
-    return num.sub(this.neg());
+  if (num.sign && !this.sign) {
+    num.sign = false;
+    var res = this.sub(num);
+    num.sign = true;
+    return res;
+  } else if (!num.sign && this.sign) {
+    this.sign = false;
+    var res = num.sub(this);
+    this.sign = true;
+    return res;
+  }
 
   if (this.length > num.length)
     return this.clone().iadd(num);
@@ -3209,15 +3214,14 @@ BN.prototype.mulTo = function mulTo(num, out) {
   for (var k = 0; k < out.length - 1; k++) {
     // Sum all words with the same `i + j = k` and accumulate `ncarry`,
     // note that ncarry could be >= 0x3ffffff
-    var ncarry = 0;
-    var rword = 0;
+    var ncarry = carry >>> 26;
+    var rword = carry & 0x3ffffff;
     var maxJ = Math.min(k, num.length - 1);
     for (var j = Math.max(0, k - this.length + 1); j <= maxJ; j++) {
       var i = k - j;
       var a = this.words[i];
       var b = num.words[j];
-      var r = a * b + carry;
-      carry = 0;
+      var r = a * b;
 
       var lo = r & 0x3ffffff;
       ncarry += (r / 0x4000000) | 0;
@@ -3350,16 +3354,18 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
   var r = bits % 26;
   var s = Math.min((bits - r) / 26, this.length);
   var mask = 0x3ffffff ^ ((0x3ffffff >> r) << r);
-  var maskedWords = extended && new Array(s);
+  var maskedWords = extended;
 
   if (s !== 0) {
     hint -= s;
     hint = Math.max(0, hint);
 
     // Extended mode, copy masked part
-    if (extended)
+    if (maskedWords) {
       for (var i = 0; i < s; i++)
-        maskedWords[i] = this.words[i];
+        maskedWords.words[i] = this.words[i];
+      maskedWords.length = s;
+    }
 
     for (var i = s; i <= this.length; i++)
       this.words[i - s] = this.words[i];
@@ -3380,8 +3386,8 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
     }
 
     // Push carried bits as a mask
-    if (extended && carry !== 0)
-      maskedWords.push(carry);
+    if (maskedWords && carry !== 0)
+      maskedWords.words[maskedWords.length++] = carry;
   }
 
   if (this.length === 0) {
@@ -3390,12 +3396,7 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
   }
 
   if (extended) {
-    var lo = new BN(null);
-    if (maskedWords.length === 0)
-      maskedWord.push(0);
-    lo.words = maskedWords;
-    lo.length = maskedWords.length;
-    return { hi: this.strip(), lo: lo.strip() };
+    return { hi: this.strip(), lo: maskedWords };
   }
 
   return this.strip();
@@ -3627,7 +3628,6 @@ BN.prototype._egcd = function _egcd(x1, p) {
     a = a.clone();
   assert(a.cmpn(0) !== 0);
 
-  x1 = x1.clone();
   var x2 = new BN(0);
   while (a.cmpn(1) !== 0 && b.cmpn(1) !== 0) {
     while (a.isEven()) {
@@ -3635,14 +3635,14 @@ BN.prototype._egcd = function _egcd(x1, p) {
       if (x1.isEven())
         x1.ishrn(1);
       else
-        x1 = x1.add(p).ishrn(1);
+        x1.iadd(p).ishrn(1);
     }
     while (b.isEven()) {
       b.ishrn(1);
       if (x2.isEven())
         x2.ishrn(1);
       else
-        x2 = x2.add(p).ishrn(1);
+        x2.iadd(p).ishrn(1);
     }
     if (a.cmp(b) >= 0) {
       a.isub(b);
@@ -3653,14 +3653,14 @@ BN.prototype._egcd = function _egcd(x1, p) {
     }
   }
   if (a.cmpn(1) === 0)
-    return x1.mod(p);
+    return x1;
   else
-    return x2.mod(p);
+    return x2;
 };
 
 // Invert number in the field F(num)
 BN.prototype.invm = function invm(num) {
-  return this._egcd(new BN(1), num);
+  return this._egcd(new BN(1), num).mod(num);
 };
 
 BN.prototype.isEven = function isEven(num) {
@@ -3901,21 +3901,23 @@ MPrime.prototype._tmp = function _tmp() {
 MPrime.prototype.ireduce = function ireduce(num) {
   // Assumes that `num` is less than `P^2`
   // num = HI * (2 ^ N - K) + HI * K + LO = HI * K + LO (mod P)
-  var r = num.clone();
+  var r = num;
   var rlen;
 
   do {
-    var pair = r.ishrn(this.n, 0, true);
-    r = this.k.mulTo(pair.hi, this.tmp);
-    r = pair.lo.iadd(r);
+    var pair = r.ishrn(this.n, 0, this.tmp);
+    r = pair.hi.imul(this.k);
+    r = r.iadd(pair.lo);
     rlen = r.bitLength();
   } while (rlen > this.n);
 
   var cmp = rlen < this.n ? -1 : r.cmp(this.p);
-  if (cmp === 0)
-    r = new BN(0);
-  else if (cmp > 0)
+  if (cmp === 0) {
+    r.words[0] = 0;
+    r.length = 1;
+  } else if (cmp > 0) {
     r.isub(this.p);
+  }
 
   return r;
 };
@@ -4113,7 +4115,11 @@ Red.prototype.sqrt = function sqrt(a) {
 };
 
 Red.prototype.invm = function invm(a) {
-  return a.invm(this.m)._forceRed(this);
+  var inv = a._egcd(new BN(1), this.m);
+  if (inv.sign)
+    return this.imod(inv).redNeg();
+  else
+    return this.imod(inv);
 };
 
 Red.prototype.pow = function pow(a, num) {
@@ -5909,7 +5915,7 @@ if (typeof Object.create === 'function') {
 },{}],22:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
@@ -5936,7 +5942,7 @@ module.exports={
     "mocha": "^1.18.2"
   },
   "dependencies": {
-    "bn.js": "^0.10.0",
+    "bn.js": "^0.10.1",
     "hash.js": "^0.2.0",
     "uglify-js": "^2.4.13"
   }
