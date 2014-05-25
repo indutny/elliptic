@@ -4,12 +4,15 @@ var hash = require('hash.js');
 
 describe('ECDSA', function() {
   it('should work with secp256k1 NIST curve', function() {
-    var curve = elliptic.nist.secp256k1;
+    var curve = elliptic.curves.secp256k1;
     assert(curve);
 
     var ecdsa = new elliptic.ecdsa(curve);
     var keys = ecdsa.genKeyPair({
-      entropy: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25 ]
+      entropy: [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25
+      ]
     });
     var msg = 'deadbeef';
 
@@ -75,7 +78,7 @@ describe('ECDSA', function() {
 
     test({
       name: 'ECDSA, 192 Bits (Prime Field)',
-      curve: elliptic.nist.p192,
+      curve: elliptic.curves.p192,
       key: '6fab034934e4c0fc9ae67f5b5659a9d7d1fefd187ee09fd4',
       pub: {
         x: 'ac2c77f529f91689fea0ea5efec7f210d8eea0b9e047ed56',
@@ -111,7 +114,7 @@ describe('ECDSA', function() {
 
     test({
       name: 'ECDSA, 224 Bits (Prime Field)',
-      curve: elliptic.nist.p224,
+      curve: elliptic.curves.p224,
       key: 'f220266e1105bfe3083e03ec7a3a654651f45e37167e88600bf257c1',
       pub: {
         x: '00cf08da5ad719e42707fa431292dea11244d64fc51610d94b130d6c',
@@ -147,7 +150,7 @@ describe('ECDSA', function() {
 
     test({
       name: 'ECDSA, 256 Bits (Prime Field)',
-      curve: elliptic.nist.p256,
+      curve: elliptic.curves.p256,
       key: 'c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721',
       pub: {
         x: '60fed4ba255a9d31c961eb74c6356d68c049b8923b61fa6ce669622e60f29fb6',
@@ -183,7 +186,7 @@ describe('ECDSA', function() {
   });
 
   it('should deterministically generate private key', function() {
-    var curve = elliptic.nist.secp256k1;
+    var curve = elliptic.curves.secp256k1;
     assert(curve);
 
     var ecdsa = new elliptic.ecdsa(curve);

@@ -69,4 +69,28 @@ describe('Curve', function() {
       split.k1.add(split.k2.mul(curve.endo.lambda)).mod(curve.n).toString(16),
       k.toString(16));
   });
+
+  it('should not fail on secp256k1 regression', function() {
+    var curve = elliptic.curves.secp256k1.curve;
+    var k1 = new bn('32efeba414cd0c830aed727749e816a01c471831536fd2fce28c56b54f5a3bb1', 16);
+    var k2 = new bn('5f2e49b5d64e53f9811545434706cde4de528af97bfd49fde1f6cf792ee37a8c', 16);
+
+    var p1 = curve.g.mul(k1);
+    var p2 = curve.g.mul(k2);
+
+    // 2 + 2 + 1 = 2 + 1 + 2
+    var two = p2.dbl();
+    var five = two.dbl().add(p2);
+    var three = two.add(p2);
+    var maybeFive = three.add(two);
+
+    assert(maybeFive.eq(five));
+
+    p1 = p1.mul(k2);
+    p2 = p2.mul(k1);
+
+    assert(p1.validate());
+    assert(p2.validate());
+    assert(p1.eq(p2));
+  });
 });
