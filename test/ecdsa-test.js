@@ -3,56 +3,60 @@ var elliptic = require('../');
 var hash = require('hash.js');
 
 describe('ECDSA', function() {
-  it('should work with secp256k1 NIST curve', function() {
-    var curve = elliptic.curves.secp256k1;
-    assert(curve);
+  function test(name) {
+    it('should work with ' + name + ' curve', function() {
+      var curve = elliptic.curves[name];
+      assert(curve);
 
-    var ecdsa = new elliptic.ec(curve);
-    var keys = ecdsa.genKeyPair({
-      entropy: [
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-        21, 22, 23, 24, 25
-      ]
+      var ecdsa = new elliptic.ec(curve);
+      var keys = ecdsa.genKeyPair({
+        entropy: [
+          1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+          21, 22, 23, 24, 25
+        ]
+      });
+      var msg = 'deadbeef';
+
+      // Get keys out of pair
+      assert(keys.getPublic().x && keys.getPublic().y);
+      assert(keys.getPrivate().length > 0);
+      assert(keys.getPublic('hex').length > 0);
+      assert(keys.getPrivate('hex').length > 0);
+      assert(keys.validate().result);
+
+      // Sign and verify
+      var signature = ecdsa.sign(msg, keys);
+      assert(ecdsa.verify(msg, signature, keys), 'Normal verify');
+
+      // Load private key from hex
+      var keys = ecdsa.keyPair(keys.getPrivate('hex'), 'hex');
+      var signature = ecdsa.sign(msg, keys);
+      assert(ecdsa.verify(msg, signature, keys), 'hex-private verify');
+
+      // Load public key from compact hex
+      var keys = ecdsa.keyPair(keys.getPublic(true, 'hex'), 'hex');
+
+      // Load public key from hex
+      var keys = ecdsa.keyPair(keys.getPublic('hex'), 'hex');
+
+      // DER encoding
+      var dsign = signature.toDER('hex');
+      assert(ecdsa.verify(msg, dsign, keys), 'hex-DER encoded verify');
+      var dsign = signature.toDER();
+      assert(ecdsa.verify(msg, dsign, keys), 'DER encoded verify');
+
+      // Wrong public key
+      var keys = ecdsa.genKeyPair();
+      assert(!ecdsa.verify(msg, signature, keys), 'Wrong key verify');
+
+      // Invalid private key
+      var keys = ecdsa.keyPair(keys.getPrivate('hex') + keys.getPrivate('hex'),
+                               'hex');
+      assert(!ecdsa.verify(msg, signature, keys), 'Wrong key verify');
     });
-    var msg = 'deadbeef';
-
-    // Get keys out of pair
-    assert(keys.getPublic().x && keys.getPublic().y);
-    assert(keys.getPrivate().length > 0);
-    assert(keys.getPublic('hex').length > 0);
-    assert(keys.getPrivate('hex').length > 0);
-    assert(keys.validate().result);
-
-    // Sign and verify
-    var signature = ecdsa.sign(msg, keys);
-    assert(ecdsa.verify(msg, signature, keys), 'Normal verify');
-
-    // Load private key from hex
-    var keys = ecdsa.keyPair(keys.getPrivate('hex'), 'hex');
-    var signature = ecdsa.sign(msg, keys);
-    assert(ecdsa.verify(msg, signature, keys), 'hex-private verify');
-
-    // Load public key from compact hex
-    var keys = ecdsa.keyPair(keys.getPublic(true, 'hex'), 'hex');
-
-    // Load public key from hex
-    var keys = ecdsa.keyPair(keys.getPublic('hex'), 'hex');
-
-    // DER encoding
-    var dsign = signature.toDER('hex');
-    assert(ecdsa.verify(msg, dsign, keys), 'hex-DER encoded verify');
-    var dsign = signature.toDER();
-    assert(ecdsa.verify(msg, dsign, keys), 'DER encoded verify');
-
-    // Wrong public key
-    var keys = ecdsa.genKeyPair();
-    assert(!ecdsa.verify(msg, signature, keys), 'Wrong key verify');
-
-    // Invalid private key
-    var keys = ecdsa.keyPair(keys.getPrivate('hex') + keys.getPrivate('hex'),
-                             'hex');
-    assert(!ecdsa.verify(msg, signature, keys), 'Wrong key verify');
-  });
+  }
+  test('secp256k1');
+  test('ed25519');
 
   describe('RFC6979 vector', function() {
     function test(opt) {
