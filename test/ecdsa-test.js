@@ -28,6 +28,10 @@ describe('ECDSA', function() {
       var signature = ecdsa.sign(msg, keys);
       assert(ecdsa.verify(msg, signature, keys), 'Normal verify');
 
+      // Sign and verify on key
+      var signature = keys.sign(msg);
+      assert(keys.verify(msg, signature), 'On-key verify');
+
       // Load private key from hex
       var keys = ecdsa.keyPair(keys.getPrivate('hex'), 'hex');
       var signature = ecdsa.sign(msg, keys);

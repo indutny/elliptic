@@ -5,10 +5,7 @@ var hash = require('hash.js');
 describe('ECDH', function() {
   function test(name) {
     it('should work with ' + name + ' curve', function() {
-      var curve = elliptic.curves[name];
-      assert(curve);
-
-      var ecdh = new elliptic.ec(curve);
+      var ecdh = new elliptic.ec(name);
       var s1 = ecdh.genKeyPair();
       var s2 = ecdh.genKeyPair();
       var sh1 = s1.derive(s2.getPublic());
