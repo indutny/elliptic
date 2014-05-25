@@ -6,30 +6,33 @@ elliptic.utils = _dereq_('./elliptic/utils');
 elliptic.rand = _dereq_('./elliptic/rand');
 elliptic.hmacDRBG = _dereq_('./elliptic/hmac-drbg');
 elliptic.curve = _dereq_('./elliptic/curve');
-elliptic.nist = _dereq_('./elliptic/nist');
-elliptic.ecdsa = _dereq_('./elliptic/ecdsa');
+elliptic.curves = _dereq_('./elliptic/curves');
 
-},{"../package.json":22,"./elliptic/curve":2,"./elliptic/ecdsa":3,"./elliptic/hmac-drbg":6,"./elliptic/nist":7,"./elliptic/rand":8,"./elliptic/utils":9}],2:[function(_dereq_,module,exports){
+// Protocols
+elliptic.ec = _dereq_('./elliptic/ec');
+
+},{"../package.json":27,"./elliptic/curve":4,"./elliptic/curves":7,"./elliptic/ec":8,"./elliptic/hmac-drbg":11,"./elliptic/rand":12,"./elliptic/utils":13}],2:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
-var elliptic = _dereq_('../elliptic');
 var bn = _dereq_('bn.js');
+var elliptic = _dereq_('../../elliptic');
 
-function Curve(conf) {
+var getNAF = elliptic.utils.getNAF;
+
+function BaseCurve(type, conf) {
+  this.type = type;
   this.p = new bn(conf.p, 16);
 
   // Use Montgomery, when there is no fast reduction for the prime
   this.red = conf.prime ? bn.red(conf.prime) : bn.mont(this.p);
-  this.a = new bn(conf.a, 16).toRed(this.red);
-  this.b = new bn(conf.b, 16).toRed(this.red);
-  this.tinv = new bn(2).toRed(this.red).redInvm();
-  this.mOne = new bn(1).toRed(this.red);
+
+  // Useful for many curves
+  this.zero = new bn(0).toRed(this.red);
+  this.one = new bn(1).toRed(this.red);
+  this.two = new bn(2).toRed(this.red);
+
+  // Curve configuration, optional
   this.n = conf.n && new bn(conf.n, 16);
-
-  this.zeroA = this.a.fromRed().cmpn(0) === 0;
-  this.threeA = this.a.fromRed().sub(this.p).cmpn(-3) === 0;
-
-  // If the curve is endomorphic, precalculate beta and lambda
-  this.endo = this._getEndomorphism(conf);
+  this.g = conf.g && this.pointFromJSON(conf.g, conf.gRed);
 
   // Temporary arrays
   this.t1 = new Array(4);
@@ -39,9 +42,802 @@ function Curve(conf) {
   this.t5 = new Array(4);
   this.t6 = new Array(4);
 }
-module.exports = Curve;
+module.exports = BaseCurve;
 
-Curve.prototype._getEndomorphism = function _getEndomorphism(conf) {
+BaseCurve.prototype.point = function point() {
+  throw new Error('Not implemented');
+};
+
+BaseCurve.prototype.validate = function validate(point) {
+  throw new Error('Not implemented');
+};
+
+BaseCurve.prototype._fixedNafMul = function _fixedNafMul(p, k) {
+  var doubles = p._getDoubles();
+
+  var naf = getNAF(k, 2);
+  var I = (1 << (doubles.step + 1)) - (doubles.step % 2 === 0 ? 2 : 1);
+  I /= 3;
+
+  // Translate into more windowed form
+  var repr = [];
+  for (var j = 0; j < naf.length; j += doubles.step) {
+    var nafW = 0;
+    for (var k = j + doubles.step - 1; k >= j; k--)
+      nafW = (nafW << 1) + naf[k];
+    repr.push(nafW);
+  }
+
+  var a = this.jpoint(null, null, null);
+  var b = this.jpoint(null, null, null);
+  for (var i = I; i > 0; i--) {
+    for (var j = 0; j < repr.length; j++) {
+      var nafW = repr[j];
+      if (nafW === i)
+        b = b.mixedAdd(doubles.points[j]);
+      else if (nafW === -i)
+        b = b.mixedAdd(doubles.points[j].neg());
+    }
+    a = a.add(b);
+  }
+  return a.toP();
+};
+
+BaseCurve.prototype._wnafMul = function _wnafMul(p, k) {
+  var w = 4;
+
+  // Precompute window
+  var nafPoints = p._getNAFPoints(w);
+  w = nafPoints.wnd;
+  var wnd = nafPoints.points;
+
+  // Get NAF form
+  var naf = getNAF(k, w);
+
+  // Add `this`*(N+1) for every w-NAF index
+  var acc = this.jpoint(null, null, null);
+  for (var i = naf.length - 1; i >= 0; i--) {
+    // Count zeroes
+    for (var k = 0; i >= 0 && naf[i] === 0; i--)
+      k++;
+    if (i >= 0)
+      k++;
+    acc = acc.dblp(k);
+
+    if (i < 0)
+      break;
+    var z = naf[i];
+    assert(z !== 0);
+    if (p.type === 'affine') {
+      // J +- P
+      if (z > 0)
+        acc = acc.mixedAdd(wnd[(z - 1) >> 1]);
+      else
+        acc = acc.mixedAdd(wnd[(-z - 1) >> 1].neg());
+    } else {
+      // J +- J
+      if (z > 0)
+        acc = acc.add(wnd[(z - 1) >> 1]);
+      else
+        acc = acc.add(wnd[(-z - 1) >> 1].neg());
+    }
+  }
+  return p.type === 'affine' ? acc.toP() : acc;
+};
+
+BaseCurve.prototype._wnafMulAdd = function _wnafMulAdd(points, coeffs, len) {
+  var wndWidth = this.t1;
+  var wnd = this.t2;
+  var naf = this.t3;
+
+  // Fill all arrays
+  var defW = 2;
+  var max = 0;
+  for (var i = 0; i < len; i++) {
+    var p = points[i];
+    var nafPoints = p._getNAFPoints(defW);
+    wndWidth[i] = nafPoints.wnd;
+    wnd[i] = nafPoints.points;
+    naf[i] = getNAF(coeffs[i], nafPoints.wnd);
+
+    max = Math.max(naf[i].length, max);
+  }
+
+  var acc = this.jpoint(null, null, null);
+  var tmp = this.t4;
+  for (var i = max; i >= 0; i--) {
+    var k = 0;
+
+    while (i >= 0) {
+      var zero = true;
+      for (var j = 0; j < len; j++) {
+        tmp[j] = naf[j][i];
+        if (tmp[j] !== 0)
+          zero = false;
+      }
+      if (!zero)
+        break;
+      k++;
+      i--;
+    }
+    if (i >= 0)
+      k++;
+    acc = acc.dblp(k);
+    if (i < 0)
+      break;
+
+    for (var j = 0; j < tmp.length; j++) {
+      var z = tmp[j];
+      if (z > 0)
+        acc = acc.mixedAdd(wnd[j][(z - 1) >> 1]);
+      else if (z < 0)
+        acc = acc.mixedAdd(wnd[j][(-z - 1) >> 1].neg());
+    }
+  }
+  return acc.toP();
+};
+
+BaseCurve.BasePoint = BasePoint;
+
+function BasePoint(curve, type) {
+  this.curve = curve;
+  this.type = type;
+  this.precomputed = null;
+}
+
+BasePoint.prototype.validate = function validate() {
+  return this.curve.validate(this);
+};
+
+BasePoint.prototype.precompute = function precompute(power, _beta) {
+  if (this.precomputed)
+    return this;
+
+  var precomputed = {
+    doubles: null,
+    naf: null,
+    beta: null
+  };
+  precomputed.naf = this._getNAFPoints(8);
+  precomputed.doubles = this._getDoubles(4, power);
+  precomputed.beta = this._getBeta();
+  this.precomputed = precomputed;
+
+  return this;
+};
+
+BasePoint.prototype._getDoubles = function _getDoubles(step, power) {
+  if (this.precomputed && this.precomputed.doubles)
+    return this.precomputed.doubles;
+
+  var doubles = [ this ];
+  var acc = this;
+  for (var i = 0; i < power; i += step) {
+    for (var j = 0; j < step; j++)
+      acc = acc.dbl();
+    doubles.push(acc);
+  }
+  return {
+    step: step,
+    points: doubles
+  };
+};
+
+BasePoint.prototype._getNAFPoints = function _getNAFPoints(wnd) {
+  if (this.precomputed && this.precomputed.naf)
+    return this.precomputed.naf;
+
+  var res = [ this ];
+  var max = (1 << (wnd - 1)) - 1;
+  var dbl = max === 1 ? null : this.dbl();
+  for (var i = 1; i < max; i++)
+    res[i] = res[i - 1].add(dbl);
+  return {
+    wnd: wnd,
+    points: res
+  };
+};
+
+BasePoint.prototype._getBeta = function _getBeta() {
+  if (this.curve.type !== 'short' || !this.curve.endo)
+    return;
+
+  var pre = this.precomputed;
+  if (pre && pre.beta)
+    return pre.beta;
+
+  var beta = this.curve.point(this.x.redMul(this.curve.endo.beta), this.y);
+  if (pre) {
+    var curve = this.curve;
+    function endoMul(p) {
+      return curve.point(p.x.redMul(curve.endo.beta), p.y);
+    }
+    pre.beta = beta;
+    beta.precomputed = {
+      beta: null,
+      naf: pre.naf && {
+        wnd: pre.naf.wnd,
+        points: pre.naf.points.map(endoMul)
+      },
+      doubles: pre.doubles && {
+        step: pre.doubles.step,
+        points: pre.doubles.points.map(endoMul)
+      }
+    };
+  }
+  return beta;
+};
+
+BasePoint.prototype.dblp = function dblp(k) {
+  var r = this;
+  for (var i = 0; i < k; i++)
+    r = r.dbl();
+  return r;
+};
+
+},{"../../elliptic":1,"assert":15,"bn.js":14}],3:[function(_dereq_,module,exports){
+var assert = _dereq_('assert');
+var curve = _dereq_('../curve');
+var elliptic = _dereq_('../../elliptic');
+var bn = _dereq_('bn.js');
+var inherits = _dereq_('inherits');
+var Base = curve.base;
+
+var getNAF = elliptic.utils.getNAF;
+
+function EdwardsCurve(conf) {
+  // NOTE: Important as we are creating point in Base.call()
+  this.twisted = conf.a != 1;
+  this.mOneA = this.twisted && conf.a == -1;
+  this.extended = this.mOneA;
+
+  Base.call(this, 'mont', conf);
+
+  this.a = new bn(conf.a, 16).mod(this.red.m).toRed(this.red);
+  this.c = new bn(conf.c, 16).toRed(this.red);
+  this.c2 = this.c.redSqr();
+  this.d = new bn(conf.d, 16).toRed(this.red);
+  this.dd = this.d.redAdd(this.d);
+
+  assert(!this.twisted || this.c.fromRed().cmpn(1) === 0);
+  this.oneC = conf.c == 1;
+}
+inherits(EdwardsCurve, Base);
+module.exports = EdwardsCurve;
+
+EdwardsCurve.prototype._mulA = function _mulA(num) {
+  if (this.mOneA)
+    return num.redNeg();
+  else
+    return this.a.redMul(num);
+};
+
+EdwardsCurve.prototype._mulC = function _mulC(num) {
+  if (this.oneC)
+    return num;
+  else
+    return this.c.redMul(num);
+};
+
+EdwardsCurve.prototype.point = function point(x, y, z, t) {
+  return new Point(this, x, y, z, t);
+};
+
+// Just for compatibility with Short curve
+EdwardsCurve.prototype.jpoint = function jpoint(x, y, z, t) {
+  return this.point(x, y, z, t);
+};
+
+EdwardsCurve.prototype.pointFromJSON = function pointFromJSON(obj) {
+  return Point.fromJSON(this, obj);
+};
+
+EdwardsCurve.prototype.pointFromX = function pointFromX(odd, x) {
+  x = new bn(x, 16);
+  if (!x.red)
+    x = x.toRed(this.red);
+
+  var x2 = x.redSqr();
+  var rhs = this.c2.redSub(this.a.redMul(x2));
+  var lhs = this.one.redSub(this.c2.redMul(this.d).redMul(x2));
+
+  var y = rhs.redMul(lhs.redInvm()).redSqrt();
+  var isOdd = y.fromRed().isOdd();
+  if (odd && !isOdd || !odd && isOdd)
+    y = y.redNeg();
+
+  return this.point(x, y, curve.one);
+};
+
+EdwardsCurve.prototype.validate = function validate(point) {
+  if (point.isInfinity())
+    return true;
+
+  // Curve: A * X^2 + Y^2 = C^2 * (1 + D * X^2 * Y^2)
+  point.normalize();
+
+  var x2 = point.x.redSqr();
+  var y2 = point.y.redSqr();
+  var lhs = x2.redMul(this.a).redAdd(y2);
+  var rhs = this.c2.redMul(this.one.redAdd(this.d.redMul(x2).redMul(y2)));
+
+  return lhs.cmp(rhs) === 0;
+};
+
+function Point(curve, x, y, z, t) {
+  Base.BasePoint.call(this, curve, 'projective');
+  if (x === null && y === null && z === null) {
+    this.x = this.curve.zero;
+    this.y = this.curve.one;
+    this.z = this.curve.one;
+    this.t = this.curve.zero;
+    this.zOne = true;
+  } else {
+    this.x = new bn(x, 16);
+    this.y = new bn(y, 16);
+    this.z = z ? new bn(z, 16) : this.curve.one;
+    this.t = t && new bn(t, 16);
+    if (!this.x.red)
+      this.x = this.x.toRed(this.curve.red);
+    if (!this.y.red)
+      this.y = this.y.toRed(this.curve.red);
+    if (!this.z.red)
+      this.z = this.z.toRed(this.curve.red);
+    if (this.t && !this.t.red)
+      this.t = this.t.toRed(this.curve.red);
+    this.zOne = this.z === this.curve.one;
+
+    // Use extended coordinates
+    if (this.curve.extended && !this.t) {
+      this.t = this.x.redMul(this.y);
+      if (!this.zOne)
+        this.t = this.t.redMul(this.z.redInvm());
+    }
+  }
+}
+inherits(Point, Base.BasePoint);
+
+Point.fromJSON = function fromJSON(curve, obj) {
+  return new Point(curve, obj[0], obj[1], obj[2]);
+};
+
+Point.prototype.inspect = function inspect() {
+  if (this.isInfinity())
+    return '<EC Point Infinity>';
+  return '<EC Point x: ' + this.x.fromRed().toString(16) +
+      ' y: ' + this.y.fromRed().toString(16) +
+      ' z: ' + this.z.fromRed().toString(16) + '>';
+};
+
+Point.prototype.isInfinity = function isInfinity() {
+  // XXX This code assumes that zero is always zero in red
+  return this.x.cmpn(0) === 0 &&
+         this.y.cmp(this.z) === 0;
+};
+
+Point.prototype._extDbl = function _extDbl() {
+  // http://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#doubling-dbl-2008-hwcd
+  // 4M + 4S
+
+  // A = X1^2
+  var a = this.x.redSqr();
+  // B = Y1^2
+  var b = this.y.redSqr();
+  // C = 2 * Z1^2
+  var c = this.z.redSqr();
+  c = c.redIAdd(c);
+  // D = a * A
+  var d = this.curve._mulA(a);
+  // E = (X1 + Y1)^2 - A - B
+  var e = this.x.redAdd(this.y).redSqr().redISub(a).redISub(b);
+  // G = D + B
+  var g = d.redAdd(b);
+  // F = G - C
+  var f = g.redSub(c);
+  // H = D - B
+  var h = d.redSub(b);
+  // X3 = E * F
+  var nx = e.redMul(f);
+  // Y3 = G * H
+  var ny = g.redMul(h);
+  // T3 = E * H
+  var nt = e.redMul(h);
+  // Z3 = F * G
+  var nz = f.redMul(g);
+  return this.curve.point(nx, ny, nz, nt);
+};
+
+Point.prototype._projDbl = function _projDbl() {
+  // http://hyperelliptic.org/EFD/g1p/auto-twisted-projective.html#doubling-dbl-2008-bbjlp
+  // http://hyperelliptic.org/EFD/g1p/auto-edwards-projective.html#doubling-dbl-2007-bl
+  // and others
+  // Generally 3M + 4S or 2M + 4S
+
+  // B = (X1 + Y1)^2
+  var b = this.x.redAdd(this.y).redSqr();
+  // C = X1^2
+  var c = this.x.redSqr();
+  // D = Y1^2
+  var d = this.y.redSqr();
+
+  if (this.curve.twisted) {
+    // E = a * C
+    var e = this.curve._mulA(c);
+    // F = E + D
+    var f = e.redAdd(d);
+    if (this.zOne) {
+      // X3 = (B - C - D) * (F - 2)
+      var nx = b.redSub(c).redSub(d).redMul(f.redSub(this.curve.two));
+      // Y3 = F * (E - D)
+      var ny = f.redMul(e.redSub(d));
+      // Z3 = F^2 - 2 * F
+      var nz = f.redSqr().redSub(f).redSub(f);
+    } else {
+      // H = Z1^2
+      var h = this.z.redSqr();
+      // J = F - 2 * H
+      var j = f.redSub(h).redISub(h);
+      // X3 = (B-C-D)*J
+      var nx = b.redSub(c).redISub(d).redMul(j);
+      // Y3 = F * (E - D)
+      var ny = f.redMul(e.redSub(d));
+      // Z3 = F * J
+      var nz = f.redMul(j);
+    }
+  } else {
+    // E = C + D
+    var e = c.redAdd(d);
+    // H = (c * Z1)^2
+    var h = this.curve._mulC(redMul(this.z)).redSqr();
+    // J = E - 2 * H
+    var j = e.redSub(h).redSub(h);
+    // X3 = c * (B - E) * J
+    var nx = this.curve._mulC(b.redISub(e)).redMul(j);
+    // Y3 = c * E * (C - D)
+    var ny = this.curve._mulC(e).redMul(c.redISub(d));
+    // Z3 = E * J
+    var nz = e.redMul(j);
+  }
+  return this.curve.point(nx, ny, nz);
+};
+
+Point.prototype.dbl = function dbl() {
+  if (this.isInfinity())
+    return this;
+
+  // Double in extended coordinates
+  if (this.curve.extended)
+    return this._extDbl();
+  else
+    return this._projDbl();
+};
+
+Point.prototype._extAdd = function _extAdd(p) {
+  // http://hyperelliptic.org/EFD/g1p/auto-twisted-extended-1.html#addition-add-2008-hwcd-3
+  // 8M
+
+  // A = (Y1 - X1) * (Y2 - X2)
+  var a = this.y.redSub(this.x).redMul(p.y.redSub(p.x));
+  // B = (Y1 + X1) * (Y2 + X2)
+  var b = this.y.redAdd(this.x).redMul(p.y.redAdd(p.x));
+  // C = T1 * k * T2
+  var c = this.t.redMul(this.curve.dd).redMul(p.t);
+  // D = Z1 * 2 * Z2
+  var d = this.z.redMul(p.z.redAdd(p.z));
+  // E = B - A
+  var e = b.redSub(a);
+  // F = D - C
+  var f = d.redSub(c);
+  // G = D + C
+  var g = d.redAdd(c);
+  // H = B + A
+  var h = b.redAdd(a);
+  // X3 = E * F
+  var nx = e.redMul(f);
+  // Y3 = G * H
+  var ny = g.redMul(h);
+  // T3 = E * H
+  var nt = e.redMul(h);
+  // Z3 = F * G
+  var nz = f.redMul(g);
+  return this.curve.point(nx, ny, nz, nt);
+};
+
+Point.prototype._projAdd = function _projAdd(p) {
+  // http://hyperelliptic.org/EFD/g1p/auto-twisted-projective.html#addition-add-2008-bbjlp
+  // http://hyperelliptic.org/EFD/g1p/auto-edwards-projective.html#addition-add-2007-bl
+  // 10M + 1S
+
+  // A = Z1 * Z2
+  var a = this.z.redMul(p.z);
+  // B = A^2
+  var b = a.redSqr();
+  // C = X1 * X2
+  var c = this.x.redMul(p.x);
+  // D = Y1 * Y2
+  var d = this.y.redMul(p.y);
+  // E = d * C * D
+  var e = this.curve.d.redMul(c).redMul(d);
+  // F = B - E
+  var f = b.redSub(e);
+  // G = B + E
+  var g = b.redAdd(e);
+  // X3 = A * F * ((X1 + Y1) * (X2 + Y2) - C - D)
+  var tmp = this.x.redAdd(this.y).redMul(p.x.redAdd(p.y)).redISub(c).redISub(d);
+  var nx = a.redMul(f).redMul(tmp);
+  if (this.curve.twisted) {
+    // Y3 = A * G * (D - a * C)
+    var ny = a.redMul(g).redMul(d.redSub(this.curve._mulA(c)));
+    // Z3 = F * G
+    var nz = f.redMul(g);
+  } else {
+    // Y3 = A * G * (D - C)
+    var ny = a.redMul(g).redMul(d.redSub(c));
+    // Z3 = c * F * G
+    var nz = this.curve._mulC(f).redMul(g);
+  }
+  return this.curve.point(nx, ny, nz);
+};
+
+Point.prototype.add = function add(p) {
+  if (this.isInfinity())
+    return p;
+  if (p.isInfinity())
+    return this;
+
+  if (this.curve.extended)
+    return this._extAdd(p);
+  else
+    return this._projAdd(p);
+};
+
+Point.prototype.mul = function mul(k) {
+  if (this.precomputed && this.precomputed.doubles)
+    return this.curve._fixedNafMul(this, k);
+  else
+    return this.curve._wnafMul(this, k);
+};
+
+Point.prototype.mulAdd = function mulAdd(k1, p, k2) {
+  return this.curve._wnafMulAdd([ this, p ], [ k1, k2 ], 2);
+};
+
+Point.prototype.normalize = function normalize() {
+  if (this.zOne)
+    return this;
+
+  // Normalize coordinates
+  var zi = this.z.redInvm();
+  this.x = this.x.redMul(zi);
+  this.y = this.y.redMul(zi);
+  if (this.t)
+    this.t = this.t.redMul(zi);
+  this.z = this.curve.one;
+  this.zOne = true;
+  return this;
+};
+
+Point.prototype.neg = function neg() {
+  return this.curve.point(this.x.redNeg(),
+                          this.y,
+                          this.z,
+                          this.t && this.t.redNeg());
+};
+
+Point.prototype.getX = function getX() {
+  this.normalize();
+  return this.x.fromRed();
+};
+
+Point.prototype.getY = function getY() {
+  this.normalize();
+  return this.y.fromRed();
+};
+
+// Compatibility with BaseCurve
+Point.prototype.toP = Point.prototype.normalize;
+Point.prototype.mixedAdd = Point.prototype.add;
+
+},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":26}],4:[function(_dereq_,module,exports){
+var curve = exports;
+
+curve.base = _dereq_('./base');
+curve.short = _dereq_('./short');
+curve.mont = _dereq_('./mont');
+curve.edwards = _dereq_('./edwards');
+
+},{"./base":2,"./edwards":3,"./mont":5,"./short":6}],5:[function(_dereq_,module,exports){
+var assert = _dereq_('assert');
+var curve = _dereq_('../curve');
+var elliptic = _dereq_('../../elliptic');
+var bn = _dereq_('bn.js');
+var inherits = _dereq_('inherits');
+var Base = curve.base;
+
+var getNAF = elliptic.utils.getNAF;
+
+function MontCurve(conf) {
+  Base.call(this, 'mont', conf);
+
+  this.a = new bn(conf.a, 16).toRed(this.red);
+  this.b = new bn(conf.b, 16).toRed(this.red);
+  this.i4 = new bn(4).toRed(this.red).redInvm();
+  this.two = new bn(2).toRed(this.red);
+  this.a24 = this.i4.redMul(this.a.redAdd(this.two));
+}
+inherits(MontCurve, Base);
+module.exports = MontCurve;
+
+MontCurve.prototype.point = function point(x, z) {
+  return new Point(this, x, z);
+};
+
+MontCurve.prototype.pointFromJSON = function pointFromJSON(obj) {
+  return Point.fromJSON(this, obj);
+}
+
+MontCurve.prototype.validate = function validate(point) {
+  var x = point.normalize().x;
+  var x2 = x.redSqr();
+  var rhs = x2.redMul(x).redAdd(x2.redMul(this.a)).redAdd(x);
+  var y = rhs.redSqrt();
+
+  return y.redSqr().cmp(rhs) === 0;
+};
+
+function Point(curve, x, z) {
+  Base.BasePoint.call(this, curve, 'projective');
+  if (x === null && z === null) {
+    this.x = this.curve.one;
+    this.z = this.curve.zero;
+  } else {
+    this.x = new bn(x, 16);
+    this.z = new bn(z, 16);
+    if (!this.x.red)
+      this.x = this.x.toRed(this.curve.red);
+    if (!this.z.red)
+      this.z = this.z.toRed(this.curve.red);
+  }
+}
+inherits(Point, Base.BasePoint);
+
+Point.prototype.precompute = function precompute() {
+  // No-op
+};
+
+Point.fromJSON = function fromJSON(curve, obj) {
+  return new Point(curve, obj[0], obj[1] || curve.one);
+};
+
+Point.prototype.inspect = function inspect() {
+  if (this.isInfinity())
+    return '<EC Point Infinity>';
+  return '<EC Point x: ' + this.x.fromRed().toString(16) +
+      ' z: ' + this.z.fromRed().toString(16) + '>';
+};
+
+Point.prototype.isInfinity = function isInfinity() {
+  // XXX This code assumes that zero is always zero in red
+  return this.z.cmpn(0) === 0;
+};
+
+Point.prototype.dbl = function dbl() {
+  // http://hyperelliptic.org/EFD/g1p/auto-montgom-xz.html#doubling-dbl-1987-m-3
+  // 2M + 2S + 4A
+
+  // A = X1 + Z1
+  var a = this.x.redAdd(this.z);
+  // AA = A^2
+  var aa = a.redSqr();
+  // B = X1 - Z1
+  var b = this.x.redSub(this.z);
+  // BB = B^2
+  var bb = b.redSqr();
+  // C = AA - BB
+  var c = aa.redSub(bb);
+  // X3 = AA * BB
+  var nx = aa.redMul(bb);
+  // Z3 = C * (BB + A24 * C)
+  var nz = c.redMul(bb.redAdd(this.curve.a24.redMul(c)));
+  return this.curve.point(nx, nz);
+};
+
+Point.prototype.add = function add(p) {
+  throw new Error('Not supported on Montgomery curve');
+};
+
+Point.prototype.diffAdd = function diffAdd(p, diff) {
+  // http://hyperelliptic.org/EFD/g1p/auto-montgom-xz.html#diffadd-dadd-1987-m-3
+  // 4M + 2S + 6A
+
+  // A = X2 + Z2
+  var a = this.x.redAdd(this.z);
+  // B = X2 - Z2
+  var b = this.x.redSub(this.z);
+  // C = X3 + Z3
+  var c = p.x.redAdd(p.z);
+  // D = X3 - Z3
+  var d = p.x.redSub(p.z);
+  // DA = D * A
+  var da = d.redMul(a);
+  // CB = C * B
+  var cb = c.redMul(b);
+  // X5 = Z1 * (DA + CB)^2
+  var nx = diff.z.redMul(da.redAdd(cb).redSqr());
+  // Z5 = X1 * (DA - CB)^2
+  var nz = diff.x.redMul(da.redISub(cb).redSqr());
+  return this.curve.point(nx, nz);
+};
+
+Point.prototype.mul = function mul(k) {
+  var t = k.clone();
+  var a = this; // (N / 2) * Q + Q
+  var b = this.curve.point(null, null); // (N / 2) * Q
+  var c = this; // Q
+
+  for (var bits = []; t.cmpn(0) !== 0; t.ishrn(1))
+    bits.push(t.andln(1));
+
+  for (var i = bits.length - 1; i >= 0; i--) {
+    if (bits[i] === 0) {
+      // N * Q + Q = ((N / 2) * Q + Q)) + (N / 2) * Q
+      a = a.diffAdd(b, c);
+      // N * Q = 2 * ((N / 2) * Q + Q))
+      b = b.dbl();
+    } else {
+      // N * Q = ((N / 2) * Q + Q) + ((N / 2) * Q)
+      b = a.diffAdd(b, c);
+      // N * Q + Q = 2 * ((N / 2) * Q + Q)
+      a = a.dbl();
+    }
+  }
+  return b;
+};
+
+Point.prototype.mulAdd = function mulAdd() {
+  throw new Error('Not supported on Montgomery curve');
+};
+
+Point.prototype.normalize = function normalize() {
+  this.x = this.x.redMul(this.z.redInvm());
+  this.z = this.curve.one;
+  return this;
+};
+
+Point.prototype.getX = function getX() {
+  // Normalize coordinates
+  this.normalize();
+
+  return this.x.fromRed();
+};
+
+},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":26}],6:[function(_dereq_,module,exports){
+var assert = _dereq_('assert');
+var curve = _dereq_('../curve');
+var elliptic = _dereq_('../../elliptic');
+var bn = _dereq_('bn.js');
+var inherits = _dereq_('inherits');
+var Base = curve.base;
+
+var getNAF = elliptic.utils.getNAF;
+
+function ShortCurve(conf) {
+  Base.call(this, 'short', conf);
+
+  this.a = new bn(conf.a, 16).toRed(this.red);
+  this.b = new bn(conf.b, 16).toRed(this.red);
+  this.tinv = this.two.redInvm();
+
+  this.zeroA = this.a.fromRed().cmpn(0) === 0;
+  this.threeA = this.a.fromRed().sub(this.p).cmpn(-3) === 0;
+
+  // If the curve is endomorphic, precalculate beta and lambda
+  this.endo = this._getEndomorphism(conf);
+}
+inherits(ShortCurve, Base);
+module.exports = ShortCurve;
+
+ShortCurve.prototype._getEndomorphism = function _getEndomorphism(conf) {
   // No efficient endomorphism
   if (!this.zeroA || !this.n || this.p.modn(3) !== 1)
     return;
@@ -72,7 +868,7 @@ Curve.prototype._getEndomorphism = function _getEndomorphism(conf) {
   };
 };
 
-Curve.prototype._getEndoRoot = function _getEndoRoot(num) {
+ShortCurve.prototype._getEndoRoot = function _getEndoRoot(num) {
   // Need to find smallest root for x^2 + x + 1 in F
   // Lambda = (-1 +- Sqrt(-3)) / 2
   //
@@ -93,7 +889,7 @@ Curve.prototype._getEndoRoot = function _getEndoRoot(num) {
     return l2;
 };
 
-Curve.prototype._getEndoBasis = function _getEndoBasis(lambda) {
+ShortCurve.prototype._getEndoBasis = function _getEndoBasis(lambda) {
   // aprxSqrt >= sqrt(this.n)
   var aprxSqrt = this.n.shrn(Math.floor(this.n.bitLength() / 2));
 
@@ -167,7 +963,7 @@ Curve.prototype._getEndoBasis = function _getEndoBasis(lambda) {
   ];
 };
 
-Curve.prototype._endoSplit = function _endoSplit(k) {
+ShortCurve.prototype._endoSplit = function _endoSplit(k) {
   var basis = this.endo.basis;
   var v1 = basis[0];
   var v2 = basis[1];
@@ -186,11 +982,11 @@ Curve.prototype._endoSplit = function _endoSplit(k) {
   return { k1: k1, k2: k2 };
 };
 
-Curve.prototype.point = function point(x, y, isRed) {
+ShortCurve.prototype.point = function point(x, y, isRed) {
   return new Point(this, x, y, isRed);
 };
 
-Curve.prototype.pointFromX = function pointFromX(odd, x) {
+ShortCurve.prototype.pointFromX = function pointFromX(odd, x) {
   x = new bn(x, 16);
   if (!x.red)
     x = x.toRed(this.red);
@@ -207,15 +1003,15 @@ Curve.prototype.pointFromX = function pointFromX(odd, x) {
   return this.point(x, y);
 };
 
-Curve.prototype.jpoint = function jpoint(x, y, z) {
+ShortCurve.prototype.jpoint = function jpoint(x, y, z) {
   return new JPoint(this, x, y, z);
 };
 
-Curve.prototype.pointFromJSON = function pointFromJSON(obj, red) {
+ShortCurve.prototype.pointFromJSON = function pointFromJSON(obj, red) {
   return Point.fromJSON(this, obj, red);
 };
 
-Curve.prototype.validate = function validate(point) {
+ShortCurve.prototype.validate = function validate(point) {
   if (point.inf)
     return true;
 
@@ -227,134 +1023,7 @@ Curve.prototype.validate = function validate(point) {
   return y.redSqr().redISub(rhs).cmpn(0) === 0;
 };
 
-Curve.prototype._fixedNafMul = function _fixedNafMul(p, k) {
-  var doubles = p._getDoubles();
-
-  var naf = getNAF(k, 2);
-  var I = (1 << (doubles.step + 1)) - (doubles.step % 2 === 0 ? 2 : 1);
-  I /= 3;
-
-  // Translate into more windowed form
-  var repr = [];
-  for (var j = 0; j < naf.length; j += doubles.step) {
-    var nafW = 0;
-    for (var k = j + doubles.step - 1; k >= j; k--)
-      nafW = (nafW << 1) + naf[k];
-    repr.push(nafW);
-  }
-
-  var a = this.jpoint(null, null, null);
-  var b = this.jpoint(null, null, null);
-  for (var i = I; i > 0; i--) {
-    for (var j = 0; j < repr.length; j++) {
-      var nafW = repr[j];
-      if (nafW === i)
-        b = b.mixedAdd(doubles.points[j]);
-      else if (nafW === -i)
-        b = b.mixedAdd(doubles.points[j].neg());
-    }
-    a = a.add(b);
-  }
-  return a.toP();
-};
-
-Curve.prototype._wnafMul = function _wnafMul(p, k) {
-  var w = 4;
-
-  // Precompute window
-  var nafPoints = p._getNAFPoints(w);
-  w = nafPoints.wnd;
-  var wnd = nafPoints.points;
-
-  // Get NAF form
-  var naf = getNAF(k, w);
-
-  // Add `this`*(N+1) for every w-NAF index
-  var acc = this.jpoint(null, null, null);
-  for (var i = naf.length - 1; i >= 0; i--) {
-    // Count zeroes
-    for (var k = 0; i >= 0 && naf[i] === 0; i--)
-      k++;
-    if (i >= 0)
-      k++;
-    acc = acc.dblp(k);
-
-    if (i < 0)
-      break;
-    var z = naf[i];
-    assert(z !== 0);
-    if (p.type === 'affine') {
-      // J +- P
-      if (z > 0)
-        acc = acc.mixedAdd(wnd[(z - 1) >> 1]);
-      else
-        acc = acc.mixedAdd(wnd[(-z - 1) >> 1].neg());
-    } else {
-      // J +- J
-      if (z > 0)
-        acc = acc.add(wnd[(z - 1) >> 1]);
-      else
-        acc = acc.add(wnd[(-z - 1) >> 1].neg());
-    }
-  }
-  return p.type === 'affine' ? acc.toP() : acc;
-};
-
-Curve.prototype._wnafMulAdd = function _wnafMulAdd(points, coeffs) {
-  assert.equal(points.length, coeffs.length);
-  var len = points.length;
-  var wndWidth = this.t1;
-  var wnd = this.t2;
-  var naf = this.t3;
-
-  // Fill all arrays
-  var defW = 2;
-  var max = 0;
-  for (var i = 0; i < len; i++) {
-    var p = points[i];
-    var nafPoints = p._getNAFPoints(defW);
-    wndWidth[i] = nafPoints.wnd;
-    wnd[i] = nafPoints.points;
-    naf[i] = getNAF(coeffs[i], nafPoints.wnd);
-
-    max = Math.max(naf[i].length, max);
-  }
-
-  var acc = this.jpoint(null, null, null);
-  var tmp = this.t4;
-  for (var i = max; i >= 0; i--) {
-    var k = 0;
-
-    while (i >= 0) {
-      var zero = true;
-      for (var j = 0; j < len; j++) {
-        tmp[j] = naf[j][i];
-        if (tmp[j] !== 0)
-          zero = false;
-      }
-      if (!zero)
-        break;
-      k++;
-      i--;
-    }
-    if (i >= 0)
-      k++;
-    acc = acc.dblp(k);
-    if (i < 0)
-      break;
-
-    for (var j = 0; j < tmp.length; j++) {
-      var z = tmp[j];
-      if (z > 0)
-        acc = acc.mixedAdd(wnd[j][(z - 1) >> 1]);
-      else if (z < 0)
-        acc = acc.mixedAdd(wnd[j][(-z - 1) >> 1].neg());
-    }
-  }
-  return acc.toP();
-};
-
-Curve.prototype._endoWnafMulAdd = function _endoWnafMulAdd(points, coeffs) {
+ShortCurve.prototype._endoWnafMulAdd = function _endoWnafMulAdd(points, coeffs) {
   var npoints = this.t5;
   var ncoeffs = this.t6;
   for (var i = 0; i < points.length; i++) {
@@ -375,12 +1044,11 @@ Curve.prototype._endoWnafMulAdd = function _endoWnafMulAdd(points, coeffs) {
     ncoeffs[i * 2] = split.k1;
     ncoeffs[i * 2 + 1] = split.k2;
   }
-  return this._wnafMulAdd(npoints, ncoeffs);
+  return this._wnafMulAdd(npoints, ncoeffs, points.length * 2);
 };
 
 function Point(curve, x, y, isRed) {
-  this.type = 'affine';
-  this.curve = curve;
+  Base.BasePoint.call(this, curve, 'affine');
   if (x === null && y === null) {
     this.x = null;
     this.y = null;
@@ -399,12 +1067,8 @@ function Point(curve, x, y, isRed) {
       this.y = this.y.toRed(this.curve.red);
     this.inf = false;
   }
-  this.precomputed = null;
 }
-
-Point.prototype.validate = function validate() {
-  return this.curve.validate(this);
-};
+inherits(Point, Base.BasePoint);
 
 Point.prototype.toJSON = function toJSON() {
   if (!this.precomputed)
@@ -446,84 +1110,6 @@ Point.fromJSON = function fromJSON(curve, obj, red) {
     }
   };
   return res;
-};
-
-Point.prototype.precompute = function precompute(power, order, _beta) {
-  if (this.precomputed)
-    return this;
-
-  var precomputed = {
-    doubles: null,
-    naf: null,
-    beta: null
-  };
-  precomputed.naf = this._getNAFPoints(8);
-  precomputed.beta = this._getBeta();
-  this.precomputed = precomputed;
-
-  return this;
-};
-
-Point.prototype._getDoubles = function _getDoubles(step, power) {
-  if (this.precomputed && this.precomputed.doubles)
-    return this.precomputed.doubles;
-
-  var doubles = [ this ];
-  var acc = this;
-  for (var i = 0; i < power; i += step) {
-    for (var j = 0; j < step; j++)
-      acc = acc.dbl();
-    doubles.push(acc);
-  }
-  return {
-    step: step,
-    points: doubles
-  };
-};
-
-Point.prototype._getNAFPoints = function _getNAFPoints(wnd) {
-  if (this.precomputed && this.precomputed.naf)
-    return this.precomputed.naf;
-
-  var res = [ this ];
-  var max = (1 << (wnd - 1)) - 1;
-  var dbl = max === 1 ? null : this.dbl();
-  for (var i = 1; i < max; i++)
-    res[i] = res[i - 1].add(dbl);
-  return {
-    wnd: wnd,
-    points: res
-  };
-};
-
-Point.prototype._getBeta = function _getBeta() {
-  if (!this.curve.endo)
-    return;
-
-  var pre = this.precomputed;
-  if (pre && pre.beta)
-    return pre.beta;
-
-  var beta = this.curve.point(this.x.redMul(this.curve.endo.beta), this.y);
-  if (pre) {
-    var curve = this.curve;
-    function endoMul(p) {
-      return curve.point(p.x.redMul(curve.endo.beta), p.y);
-    }
-    pre.beta = beta;
-    beta.precomputed = {
-      beta: null,
-      naf: pre.naf && {
-        wnd: pre.naf.wnd,
-        points: pre.naf.points.map(endoMul)
-      },
-      doubles: pre.doubles && {
-        step: pre.doubles.step,
-        points: pre.doubles.points.map(endoMul)
-      }
-    };
-  }
-  return beta;
 };
 
 Point.prototype.inspect = function inspect() {
@@ -592,35 +1178,6 @@ Point.prototype.getY = function getY() {
   return this.y.fromRed();
 };
 
-function getNAF(num, w) {
-  // Represent k in a w-NAF form
-  var naf = [];
-  var ws = 1 << w;
-  var k = num.clone();
-  while (k.cmpn(1) >= 0) {
-    var z;
-    if (k.isOdd()) {
-      var mod = k.andln(ws - 1);
-      if (mod > (ws >> 1) - 1)
-        z = (ws >> 1) - mod;
-      else
-        z = mod;
-      k.isubn(z);
-    } else {
-      z = 0;
-    }
-    naf.push(z);
-
-    // Optimization, shift by word if possible
-    var shift = (k.cmpn(0) !== 0 && k.andln(ws - 1) === 0) ? w : 1;
-    for (var i = 1; i < shift; i++)
-      naf.push(0);
-    k.ishrn(shift);
-  }
-
-  return naf;
-}
-
 // Hybrid Binary-Ternary Joint Sparse Form
 function HBTJSF(k1, k2) {
   var hbt1 = [];
@@ -659,6 +1216,8 @@ Point.prototype.mul = function mul(k) {
 
   if (this.precomputed && this.precomputed.doubles)
     return this.curve._fixedNafMul(this, k);
+  else if (this.curve.endo)
+    return this.curve._endoWnafMulAdd([ this ], [ k ]);
   else
     return this.curve._wnafMul(this, k);
 };
@@ -741,7 +1300,7 @@ Point.prototype.mulAdd = function mulAdd(k1, p2, k2) {
   if (this.curve.endo)
     return this.curve._endoWnafMulAdd([ this, p2 ], [ k1, k2 ]);
   else
-    return this.curve._wnafMulAdd([ this, p2 ], [ k1, k2 ]);
+    return this.curve._wnafMulAdd([ this, p2 ], [ k1, k2 ], 2);
 };
 
 Point.prototype.eq = function eq(p) {
@@ -778,16 +1337,15 @@ Point.prototype.toJ = function toJ() {
   if (this.inf)
     return this.curve.jpoint(null, null, null);
 
-  var res = this.curve.jpoint(this.x, this.y, this.curve.mOne);
+  var res = this.curve.jpoint(this.x, this.y, this.curve.one);
   return res;
 };
 
 function JPoint(curve, x, y, z) {
-  this.type = 'jacobian';
-  this.curve = curve;
+  Base.BasePoint.call(this, curve, 'jacobian');
   if (x === null && y === null && z === null) {
-    this.x = this.curve.mOne;
-    this.y = this.curve.mOne;
+    this.x = this.curve.one;
+    this.y = this.curve.one;
     this.z = new bn(0);
   } else {
     this.x = new bn(x, 16);
@@ -801,8 +1359,9 @@ function JPoint(curve, x, y, z) {
   if (!this.z.red)
     this.z = this.z.toRed(this.curve.red);
 
-  this.zOne = this.z === this.curve.mOne;
+  this.zOne = this.z === this.curve.one;
 }
+inherits(JPoint, Base.BasePoint);
 
 JPoint.prototype.toP = function toP() {
   if (this.isInfinity())
@@ -1196,479 +1755,41 @@ JPoint.prototype.inspect = function inspect() {
 };
 
 JPoint.prototype.isInfinity = function isInfinity() {
+  // XXX This code assumes that zero is always zero in red
   return this.z.cmpn(0) === 0;
 };
 
-},{"../elliptic":1,"assert":11,"bn.js":10}],3:[function(_dereq_,module,exports){
-var assert = _dereq_('assert');
-var bn = _dereq_('bn.js');
-var elliptic = _dereq_('../../elliptic');
-var utils = elliptic.utils;
-
-var KeyPair = _dereq_('./key');
-var Signature = _dereq_('./signature');
-
-function ECDSA(options) {
-  if (!(this instanceof ECDSA))
-    return new ECDSA(options);
-
-  // Shortcut for `elliptic.ecdsa(elliptic.nist.curve)`
-  if (options instanceof elliptic.nist.NISTCurve)
-    options = { curve: options };
-
-  this.curve = options.curve.curve;
-  // Order of the point
-  this.n = options.curve.n;
-  // Point on curve
-  this.g = options.curve.g;
-  this.g.precompute(options.curve.n.bitLength() + 1, this.n);
-  // Hash for function for DRBG
-  this.hash = options.hash || options.curve.hash;
-}
-module.exports = ECDSA;
-
-ECDSA.prototype.keyPair = function keyPair(priv, pub) {
-  return new KeyPair(this, priv, pub);
-};
-
-ECDSA.prototype.genKeyPair = function genKeyPair(options) {
-  if (!options)
-    options = {};
-
-  // Instantiate Hmac_DRBG
-  var drbg = new elliptic.hmacDRBG({
-    hash: this.hash,
-    pers: options.pers,
-    entropy: options.entropy || elliptic.rand(this.hash.hmacStrength),
-    nonce: this.n.toArray()
-  });
-
-  var bytes = this.n.byteLength();
-  var ns2 = this.n.sub(new bn(2));
-  do {
-    var priv = new bn(drbg.generate(bytes));
-    if (priv.cmp(ns2) > 0)
-      continue;
-
-    priv.iaddn(1);
-    return this.keyPair(priv);
-  } while (true);
-};
-
-ECDSA.prototype._truncateToN = function truncateToN(msg, truncOnly) {
-  var delta = msg.byteLength() * 8 - this.n.bitLength();
-  if (delta > 0)
-    msg = msg.shrn(delta);
-  if (!truncOnly && msg.cmp(this.n) >= 0)
-    return msg.sub(this.n);
-  else
-    return msg;
-};
-
-ECDSA.prototype.sign = function sign(msg, key) {
-  key = this.keyPair(key, 'hex');
-  msg = this._truncateToN(new bn(msg, 16));
-
-  // Zero-extend key to provide enough entropy
-  var bytes = this.n.byteLength();
-  var bkey = key.getPrivate().toArray();
-  for (var i = bkey.length; i < 21; i++)
-    bkey.unshift(0);
-
-  // Zero-extend nonce to have the same byte size as N
-  var nonce = msg.toArray();
-  for (var i = nonce.length; i < bytes; i++)
-    nonce.unshift(0);
-
-  // Instantiate Hmac_DRBG
-  var drbg = new elliptic.hmacDRBG({
-    hash: this.hash,
-    entropy: bkey,
-    nonce: nonce
-  });
-
-  // Number of bytes to generate
-  var ns1 = this.n.sub(new bn(1));
-  do {
-    var k = new bn(drbg.generate(this.n.byteLength()));
-    k = this._truncateToN(k, true);
-    if (k.cmpn(1) <= 0 || k.cmp(ns1) >= 0)
-      continue;
-
-    var kp = this.g.mul(k);
-    if (kp.isInfinity())
-      continue;
-
-    var r = kp.getX().mod(this.n);
-    if (r.cmpn(0) === 0)
-      continue;
-
-    var s = k.invm(this.n).mul(r.mul(key.getPrivate()).iadd(msg)).mod(this.n);
-    if (s.cmpn(0) === 0)
-      continue;
-
-    return new Signature(r, s);
-  } while (true);
-};
-
-ECDSA.prototype.verify = function verify(msg, signature, key) {
-  msg = this._truncateToN(new bn(msg, 16));
-  key = this.keyPair(key, 'hex');
-  signature = new Signature(signature, 'hex');
-
-  // Perform primitive values validation
-  var r = signature.r;
-  var s = signature.s;
-  if (r.cmpn(1) < 0 || r.cmp(this.n) >= 0)
-    return false;
-  if (s.cmpn(1) < 0 || s.cmp(this.n) >= 0)
-    return false;
-
-  // Validate signature
-  var sinv = s.invm(this.n);
-  var u1 = sinv.mul(msg).mod(this.n);
-  var u2 = sinv.mul(r).mod(this.n);
-
-  var p = this.g.mulAdd(u1, key.getPublic(), u2);
-  if (p.isInfinity())
-    return false;
-
-  return p.getX().mod(this.n).cmp(r) === 0;
-};
-
-},{"../../elliptic":1,"./key":4,"./signature":5,"assert":11,"bn.js":10}],4:[function(_dereq_,module,exports){
-var assert = _dereq_('assert');
-var bn = _dereq_('bn.js');
-
-var elliptic = _dereq_('../../elliptic');
-var utils = elliptic.utils;
-
-function KeyPair(ecdsa, priv, pub) {
-  if (priv instanceof KeyPair)
-    return priv;
-  if (pub instanceof KeyPair)
-    return pub;
-
-  if (!priv) {
-    priv = pub;
-    pub = null;
-  }
-  if (priv !== null && typeof priv === 'object') {
-    if (priv.x && priv.y) {
-      // KeyPair(public)
-      pub = priv;
-      priv = null;
-    } else if (priv.priv || priv.pub) {
-      // KeyPair({ priv: ..., pub: ... })
-      pub = priv.pub;
-      priv = priv.priv;
-    }
-  }
-
-  this.ecdsa = ecdsa;
-  this.priv = null;
-  this.pub = null;
-
-  // KeyPair(public, 'hex')
-  if (this._importPublicHex(priv, pub))
-    return;
-
-  if (pub === 'hex')
-    pub = null;
-
-  // KeyPair(priv, pub)
-  if (priv)
-    this._importPrivate(priv);
-  if (pub)
-    this._importPublic(pub);
-}
-module.exports = KeyPair;
-
-KeyPair.prototype.validate = function validate() {
-  var pub = this.getPublic();
-
-  if (pub.isInfinity())
-    return { result: false, reason: 'Invalid public key' };
-  if (!pub.validate())
-    return { result: false, reason: 'Public key is not a point' };
-  if (!pub.mul(this.ecdsa.n).isInfinity())
-    return { result: false, reason: 'Public key * N != O' };
-
-  return { result: true, reason: null };
-};
-
-KeyPair.prototype.getPublic = function getPublic(compact, enc) {
-  if (!this.pub)
-    this.pub = this.ecdsa.g.mul(this.priv);
-
-  // compact is optional argument
-  if (typeof compact === 'string') {
-    enc = compact;
-    compact = null;
-  }
-
-  if (!enc)
-    return this.pub;
-
-  var len = this.ecdsa.curve.p.byteLength();
-  var x = this.pub.getX().toArray();
-
-  for (var i = x.length; i < len; i++)
-    x.unshift(0);
-
-  if (compact) {
-    var res = [ this.pub.getY().isEven() ? 0x02 : 0x03 ].concat(x);
-  } else {
-    var y = this.pub.getY().toArray();
-    for (var i = y.length; i < len; i++)
-      y.unshift(0);
-    var res = [ 0x04 ].concat(x, y);
-  }
-  return utils.encode(res, enc);
-};
-
-KeyPair.prototype.getPrivate = function getPrivate(enc) {
-  if (enc === 'hex')
-    return this.priv.toString(16);
-  else
-    return this.priv;
-};
-
-KeyPair.prototype._importPrivate = function _importPrivate(key) {
-  this.priv = new bn(key, 16);
-
-  // Ensure that the priv won't be bigger than n, otherwise we may fail
-  // in fixed multiplication method
-  this.priv = this.priv.mod(this.ecdsa.n);
-};
-
-KeyPair.prototype._importPublic = function _importPublic(key) {
-  this.pub = this.ecdsa.curve.point(key.x, key.y);
-};
-
-KeyPair.prototype._importPublicHex = function _importPublic(key, enc) {
-  key = utils.toArray(key, enc);
-  var len = this.ecdsa.curve.p.byteLength();
-  if (key[0] === 0x04 && key.length - 1 === 2 * len) {
-    this.pub = this.ecdsa.curve.point(
-      key.slice(1, 1 + len),
-      key.slice(1 + len, 1 + 2 * len));
-  } else if ((key[0] === 0x02 || key[0] === 0x03) && key.length - 1 === len) {
-    this.pub = this.ecdsa.curve.pointFromX(key[0] === 0x03,
-                                           key.slice(1, 1 +len));
-  } else {
-    return false;
-  }
-
-  return true;
-};
-
-},{"../../elliptic":1,"assert":11,"bn.js":10}],5:[function(_dereq_,module,exports){
-var assert = _dereq_('assert');
-var bn = _dereq_('bn.js');
-
-var elliptic = _dereq_('../../elliptic');
-var utils = elliptic.utils;
-
-function Signature(r, s) {
-  if (r instanceof Signature)
-    return r;
-
-  if (this._importDER(r, s))
-    return;
-
-  assert(r && s, 'Signature without r or s');
-  this.r = new bn(r, 16);
-  this.s = new bn(s, 16);
-}
-module.exports = Signature;
-
-Signature.prototype._importDER = function _importDER(data, enc) {
-  data = utils.toArray(data, enc);
-  if (data.length < 6 || data[0] !== 0x30 || data[2] !== 0x02)
-    return false;
-  var total = data[1];
-  if (1 + total > data.length)
-    return false;
-  var rlen = data[3];
-  // Short length notation
-  if (rlen >= 0x80)
-    return false;
-  if (4 + rlen + 2 >= data.length)
-    return false;
-  if (data[4 + rlen] !== 0x02)
-    return false;
-  var slen = data[5 + rlen];
-  // Short length notation
-  if (slen >= 0x80)
-    return false;
-  if (4 + rlen + 2 + slen > data.length)
-    return false;
-
-  this.r = new bn(data.slice(4, 4 + rlen));
-  this.s = new bn(data.slice(4 + rlen + 2, 4 + rlen + 2 + slen));
-
-  return true;
-};
-
-Signature.prototype.toDER = function toDER(enc) {
-  var r = this.r.toArray();
-  var s = this.s.toArray();
-
-  // Pad values
-  if (r[0] & 0x80)
-    r = [ 0 ].concat(r);
-  // Pad values
-  if (s[0] & 0x80)
-    s = [ 0 ].concat(s);
-
-  var total = r.length + s.length + 4;
-  var res = [ 0x30, total, 0x02, r.length ];
-  res = res.concat(r, [ 0x02, s.length ], s);
-  return utils.encode(res, enc);
-};
-
-},{"../../elliptic":1,"assert":11,"bn.js":10}],6:[function(_dereq_,module,exports){
-var assert = _dereq_('assert');
-
-var hash = _dereq_('hash.js');
-var elliptic = _dereq_('../elliptic');
-var utils = elliptic.utils;
-
-function HmacDRBG(options) {
-  if (!(this instanceof HmacDRBG))
-    return new HmacDRBG(options);
-  this.hash = options.hash;
-  this.predResist = !!options.predResist;
-
-  this.outLen = this.hash.outSize;
-  this.minEntropy = options.minEntropy || this.hash.hmacStrength;
-
-  this.reseed = null;
-  this.reseedInterval = null;
-  this.K = null;
-  this.V = null;
-
-  var entropy = utils.toArray(options.entropy, options.entropyEnc);
-  var nonce = utils.toArray(options.nonce, options.nonceEnc);
-  var pers = utils.toArray(options.pers, options.persEnc);
-  assert(entropy.length >= (this.minEntropy / 8),
-         'Not enough entropy. Minimum is: ' + this.minEntropy + ' bits');
-  this._init(entropy, nonce, pers);
-}
-module.exports = HmacDRBG;
-
-HmacDRBG.prototype._init = function init(entropy, nonce, pers) {
-  var seed = entropy.concat(nonce).concat(pers);
-
-  this.K = new Array(this.outLen / 8);
-  this.V = new Array(this.outLen / 8);
-  for (var i = 0; i < this.V.length; i++) {
-    this.K[i] = 0x00;
-    this.V[i] = 0x01;
-  }
-
-  this._update(seed);
-  this.reseed = 1;
-  this.reseedInterval = 0x1000000000000;  // 2^48
-};
-
-HmacDRBG.prototype._hmac = function hmac() {
-  return new hash.hmac(this.hash, this.K);
-};
-
-HmacDRBG.prototype._update = function update(seed) {
-  var kmac = this._hmac()
-                 .update(this.V)
-                 .update([ 0x00 ]);
-  if (seed)
-    kmac = kmac.update(seed);
-  this.K = kmac.digest();
-  this.V = this._hmac().update(this.V).digest();
-  if (!seed)
-    return;
-
-  this.K = this._hmac()
-               .update(this.V)
-               .update([ 0x01 ])
-               .update(seed)
-               .digest();
-  this.V = this._hmac().update(this.V).digest();
-};
-
-HmacDRBG.prototype.reseed = function reseed(entropy, entropyEnc, add, addEnc) {
-  // Optional entropy enc
-  if (typeof entropyEnc !== 'string') {
-    addEnc = add;
-    add = entropyEnc;
-    entropyEnc = null;
-  }
-
-  entropy = utils.toBuffer(entropy, entropyEnc);
-  add = utils.toBuffer(add, addEnc);
-
-  assert(entropy.length >= (this.minEntropy / 8),
-         'Not enough entropy. Minimum is: ' + this.minEntropy + ' bits');
-
-  this._update(entropy.concat(add || []));
-  this.reseed = 1;
-};
-
-HmacDRBG.prototype.generate = function generate(len, enc, add, addEnc) {
-  if (this.reseed > this.reseedInterval)
-    throw new Error('Reseed is required');
-
-  // Optional encoding
-  if (typeof enc !== 'string') {
-    addEnc = add;
-    add = enc;
-    enc = null;
-  }
-
-  // Optional additional data
-  if (add) {
-    add = utils.toArray(add, addEnc);
-    this._update(add);
-  }
-
-  var temp = [];
-  while (temp.length < len) {
-    this.V = this._hmac().update(this.V).digest();
-    temp = temp.concat(this.V);
-  }
-
-  var res = temp.slice(0, len);
-  this._update(add);
-  this.reseed++;
-  return utils.encode(res, enc);
-};
-
-},{"../elliptic":1,"assert":11,"hash.js":16}],7:[function(_dereq_,module,exports){
-var nist = exports;
+},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":26}],7:[function(_dereq_,module,exports){
+var curves = exports;
 
 var assert = _dereq_('assert');
 var hash = _dereq_('hash.js');
 var bn = _dereq_('bn.js');
 var elliptic = _dereq_('../elliptic');
 
-function NISTCurve(options) {
-  this.curve = new elliptic.curve(options);
-  this.g = this.curve.pointFromJSON(options.g, options.gRed);
-  this.n = new bn(options.n, 16);
+function PresetCurve(options) {
+  if (options.type === 'short')
+    this.curve = new elliptic.curve.short(options);
+  else if (options.type === 'edwards')
+    this.curve = new elliptic.curve.edwards(options);
+  else
+    this.curve = new elliptic.curve.mont(options);
+  this.g = this.curve.g;
+  this.n = this.curve.n;
   this.hash = options.hash;
 
-  assert(this.g.validate(), 'Invalid NIST curve');
-  assert(this.g.mul(this.n).isInfinity(), 'Invalid NIST curve, G*N != O');
+  assert(this.g.validate(), 'Invalid curve');
+  assert(this.g.mul(this.n).isInfinity(), 'Invalid curve, G*N != O');
 }
-nist.NISTCurve = NISTCurve;
+curves.PresetCurve = PresetCurve;
 
 function defineCurve(name, options) {
-  Object.defineProperty(nist, name, {
+  Object.defineProperty(curves, name, {
     configurable: true,
     enumerable: true,
     get: function() {
-      var curve = new NISTCurve(options);
-      Object.defineProperty(nist, name, {
+      var curve = new PresetCurve(options);
+      Object.defineProperty(curves, name, {
         configurable: true,
         enumerable: true,
         value: curve
@@ -1679,6 +1800,7 @@ function defineCurve(name, options) {
 }
 
 defineCurve('p192', {
+  type: 'short',
   prime: 'p192',
   p: 'ffffffff ffffffff ffffffff fffffffe ffffffff ffffffff',
   a: 'ffffffff ffffffff ffffffff fffffffe ffffffff fffffffc',
@@ -1693,6 +1815,7 @@ defineCurve('p192', {
 });
 
 defineCurve('p224', {
+  type: 'short',
   prime: 'p224',
   p: 'ffffffff ffffffff ffffffff ffffffff 00000000 00000000 00000001',
   a: 'ffffffff ffffffff ffffffff fffffffe ffffffff ffffffff fffffffe',
@@ -1707,6 +1830,7 @@ defineCurve('p224', {
 });
 
 defineCurve('p256', {
+  type: 'short',
   prime: null,
   p: 'ffffffff 00000001 00000000 00000000 00000000 ffffffff ffffffff ffffffff',
   a: 'ffffffff 00000001 00000000 00000000 00000000 ffffffff ffffffff fffffffc',
@@ -1720,7 +1844,41 @@ defineCurve('p256', {
   ],
 });
 
+defineCurve('curve25519', {
+  type: 'mont',
+  prime: 'p25519',
+  p: '7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed',
+  a: '76d06',
+  b: '0',
+  n: '1000000000000000 0000000000000000 14def9dea2f79cd6 5812631a5cf5d3ed',
+  hash: hash.sha256,
+  gRed: false,
+  g: [
+    '9'
+  ]
+});
+
+defineCurve('ed25519', {
+  type: 'edwards',
+  prime: 'p25519',
+  p: '7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed',
+  a: '-1',
+  c: '1',
+  // -121665 * (121666^(-1)) (mod P)
+  d: '52036cee2b6ffe73 8cc740797779e898 00700a4d4141d8ab 75eb4dca135978a3',
+  n: '1000000000000000 0000000000000000 14def9dea2f79cd6 5812631a5cf5d3ed',
+  hash: hash.sha256,
+  gRed: false,
+  g: [
+    '216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51a',
+
+    // 4/5
+    '6666666666666666666666666666666666666666666666666666666666666658'
+  ]
+});
+
 defineCurve('secp256k1', {
+  type: 'short',
   prime: 'k256',
   p: 'ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff fffffffe fffffc2f',
   a: '0',
@@ -2530,7 +2688,476 @@ defineCurve('secp256k1', {
   ]
 });
 
-},{"../elliptic":1,"assert":11,"bn.js":10,"hash.js":16}],8:[function(_dereq_,module,exports){
+},{"../elliptic":1,"assert":15,"bn.js":14,"hash.js":20}],8:[function(_dereq_,module,exports){
+var assert = _dereq_('assert');
+var bn = _dereq_('bn.js');
+var elliptic = _dereq_('../../elliptic');
+var utils = elliptic.utils;
+
+var KeyPair = _dereq_('./key');
+var Signature = _dereq_('./signature');
+
+function EC(options) {
+  if (!(this instanceof EC))
+    return new EC(options);
+
+  // Shortcut `elliptic.ec(curve-name)`
+  if (typeof options === 'string')
+    options = elliptic.curves[options];
+
+  // Shortcut for `elliptic.ec(elliptic.curves.curveName)`
+  if (options instanceof elliptic.curves.PresetCurve)
+    options = { curve: options };
+
+  this.curve = options.curve.curve;
+  this.n = this.curve.n;
+  this.g = this.curve.g;
+
+  // Point on curve
+  this.g = options.curve.g;
+  this.g.precompute(options.curve.n.bitLength() + 1);
+
+  // Hash for function for DRBG
+  this.hash = options.hash || options.curve.hash;
+}
+module.exports = EC;
+
+EC.prototype.keyPair = function keyPair(priv, pub) {
+  return new KeyPair(this, priv, pub);
+};
+
+EC.prototype.genKeyPair = function genKeyPair(options) {
+  if (!options)
+    options = {};
+
+  // Instantiate Hmac_DRBG
+  var drbg = new elliptic.hmacDRBG({
+    hash: this.hash,
+    pers: options.pers,
+    entropy: options.entropy || elliptic.rand(this.hash.hmacStrength),
+    nonce: this.n.toArray()
+  });
+
+  var bytes = this.n.byteLength();
+  var ns2 = this.n.sub(new bn(2));
+  do {
+    var priv = new bn(drbg.generate(bytes));
+    if (priv.cmp(ns2) > 0)
+      continue;
+
+    priv.iaddn(1);
+    return this.keyPair(priv);
+  } while (true);
+};
+
+EC.prototype._truncateToN = function truncateToN(msg, truncOnly) {
+  var delta = msg.byteLength() * 8 - this.n.bitLength();
+  if (delta > 0)
+    msg = msg.shrn(delta);
+  if (!truncOnly && msg.cmp(this.n) >= 0)
+    return msg.sub(this.n);
+  else
+    return msg;
+};
+
+EC.prototype.sign = function sign(msg, key) {
+  key = this.keyPair(key, 'hex');
+  msg = this._truncateToN(new bn(msg, 16));
+
+  // Zero-extend key to provide enough entropy
+  var bytes = this.n.byteLength();
+  var bkey = key.getPrivate().toArray();
+  for (var i = bkey.length; i < 21; i++)
+    bkey.unshift(0);
+
+  // Zero-extend nonce to have the same byte size as N
+  var nonce = msg.toArray();
+  for (var i = nonce.length; i < bytes; i++)
+    nonce.unshift(0);
+
+  // Instantiate Hmac_DRBG
+  var drbg = new elliptic.hmacDRBG({
+    hash: this.hash,
+    entropy: bkey,
+    nonce: nonce
+  });
+
+  // Number of bytes to generate
+  var ns1 = this.n.sub(new bn(1));
+  do {
+    var k = new bn(drbg.generate(this.n.byteLength()));
+    k = this._truncateToN(k, true);
+    if (k.cmpn(1) <= 0 || k.cmp(ns1) >= 0)
+      continue;
+
+    var kp = this.g.mul(k);
+    if (kp.isInfinity())
+      continue;
+
+    var r = kp.getX().mod(this.n);
+    if (r.cmpn(0) === 0)
+      continue;
+
+    var s = k.invm(this.n).mul(r.mul(key.getPrivate()).iadd(msg)).mod(this.n);
+    if (s.cmpn(0) === 0)
+      continue;
+
+    return new Signature(r, s);
+  } while (true);
+};
+
+EC.prototype.verify = function verify(msg, signature, key) {
+  msg = this._truncateToN(new bn(msg, 16));
+  key = this.keyPair(key, 'hex');
+  signature = new Signature(signature, 'hex');
+
+  // Perform primitive values validation
+  var r = signature.r;
+  var s = signature.s;
+  if (r.cmpn(1) < 0 || r.cmp(this.n) >= 0)
+    return false;
+  if (s.cmpn(1) < 0 || s.cmp(this.n) >= 0)
+    return false;
+
+  // Validate signature
+  var sinv = s.invm(this.n);
+  var u1 = sinv.mul(msg).mod(this.n);
+  var u2 = sinv.mul(r).mod(this.n);
+
+  var p = this.g.mulAdd(u1, key.getPublic(), u2);
+  if (p.isInfinity())
+    return false;
+
+  return p.getX().mod(this.n).cmp(r) === 0;
+};
+
+},{"../../elliptic":1,"./key":9,"./signature":10,"assert":15,"bn.js":14}],9:[function(_dereq_,module,exports){
+var assert = _dereq_('assert');
+var bn = _dereq_('bn.js');
+
+var elliptic = _dereq_('../../elliptic');
+var utils = elliptic.utils;
+
+function KeyPair(ec, priv, pub) {
+  if (priv instanceof KeyPair)
+    return priv;
+  if (pub instanceof KeyPair)
+    return pub;
+
+  if (!priv) {
+    priv = pub;
+    pub = null;
+  }
+  if (priv !== null && typeof priv === 'object') {
+    if (priv.x) {
+      // KeyPair(public)
+      pub = priv;
+      priv = null;
+    } else if (priv.priv || priv.pub) {
+      // KeyPair({ priv: ..., pub: ... })
+      pub = priv.pub;
+      priv = priv.priv;
+    }
+  }
+
+  this.ec = ec;
+  this.priv = null;
+  this.pub = null;
+
+  // KeyPair(public, 'hex')
+  if (this._importPublicHex(priv, pub))
+    return;
+
+  if (pub === 'hex')
+    pub = null;
+
+  // KeyPair(priv, pub)
+  if (priv)
+    this._importPrivate(priv);
+  if (pub)
+    this._importPublic(pub);
+}
+module.exports = KeyPair;
+
+KeyPair.prototype.validate = function validate() {
+  var pub = this.getPublic();
+
+  if (pub.isInfinity())
+    return { result: false, reason: 'Invalid public key' };
+  if (!pub.validate())
+    return { result: false, reason: 'Public key is not a point' };
+  if (!pub.mul(this.ec.curve.n).isInfinity())
+    return { result: false, reason: 'Public key * N != O' };
+
+  return { result: true, reason: null };
+};
+
+KeyPair.prototype.getPublic = function getPublic(compact, enc) {
+  if (!this.pub)
+    this.pub = this.ec.g.mul(this.priv);
+
+  // compact is optional argument
+  if (typeof compact === 'string') {
+    enc = compact;
+    compact = null;
+  }
+
+  if (!enc)
+    return this.pub;
+
+  var len = this.ec.curve.p.byteLength();
+  var x = this.pub.getX().toArray();
+
+  for (var i = x.length; i < len; i++)
+    x.unshift(0);
+
+  if (compact) {
+    var res = [ this.pub.getY().isEven() ? 0x02 : 0x03 ].concat(x);
+  } else {
+    var y = this.pub.getY().toArray();
+    for (var i = y.length; i < len; i++)
+      y.unshift(0);
+    var res = [ 0x04 ].concat(x, y);
+  }
+  return utils.encode(res, enc);
+};
+
+KeyPair.prototype.getPrivate = function getPrivate(enc) {
+  if (enc === 'hex')
+    return this.priv.toString(16);
+  else
+    return this.priv;
+};
+
+KeyPair.prototype._importPrivate = function _importPrivate(key) {
+  this.priv = new bn(key, 16);
+
+  // Ensure that the priv won't be bigger than n, otherwise we may fail
+  // in fixed multiplication method
+  this.priv = this.priv.mod(this.ec.curve.n);
+};
+
+KeyPair.prototype._importPublic = function _importPublic(key) {
+  this.pub = this.ec.curve.point(key.x, key.y);
+};
+
+KeyPair.prototype._importPublicHex = function _importPublic(key, enc) {
+  key = utils.toArray(key, enc);
+  var len = this.ec.curve.p.byteLength();
+  if (key[0] === 0x04 && key.length - 1 === 2 * len) {
+    this.pub = this.ec.curve.point(
+      key.slice(1, 1 + len),
+      key.slice(1 + len, 1 + 2 * len));
+  } else if ((key[0] === 0x02 || key[0] === 0x03) && key.length - 1 === len) {
+    this.pub = this.ec.curve.pointFromX(key[0] === 0x03,
+                                        key.slice(1, 1 +len));
+  } else {
+    return false;
+  }
+
+  return true;
+};
+
+// ECDH
+KeyPair.prototype.derive = function derive(pub) {
+  return pub.mul(this.priv).getX();
+};
+
+// ECDSA
+KeyPair.prototype.sign = function sign(msg) {
+  return this.ec.sign(msg, this);
+};
+
+KeyPair.prototype.verify = function verify(msg, signature) {
+  return this.ec.verify(msg, signature, this);
+};
+
+KeyPair.prototype.inspect = function inspect() {
+  return '<Key priv: ' + (this.priv && this.priv.toString(16)) +
+         ' pub: ' + (this.pub && this.pub.inspect()) + ' >';
+};
+
+},{"../../elliptic":1,"assert":15,"bn.js":14}],10:[function(_dereq_,module,exports){
+var assert = _dereq_('assert');
+var bn = _dereq_('bn.js');
+
+var elliptic = _dereq_('../../elliptic');
+var utils = elliptic.utils;
+
+function Signature(r, s) {
+  if (r instanceof Signature)
+    return r;
+
+  if (this._importDER(r, s))
+    return;
+
+  assert(r && s, 'Signature without r or s');
+  this.r = new bn(r, 16);
+  this.s = new bn(s, 16);
+}
+module.exports = Signature;
+
+Signature.prototype._importDER = function _importDER(data, enc) {
+  data = utils.toArray(data, enc);
+  if (data.length < 6 || data[0] !== 0x30 || data[2] !== 0x02)
+    return false;
+  var total = data[1];
+  if (1 + total > data.length)
+    return false;
+  var rlen = data[3];
+  // Short length notation
+  if (rlen >= 0x80)
+    return false;
+  if (4 + rlen + 2 >= data.length)
+    return false;
+  if (data[4 + rlen] !== 0x02)
+    return false;
+  var slen = data[5 + rlen];
+  // Short length notation
+  if (slen >= 0x80)
+    return false;
+  if (4 + rlen + 2 + slen > data.length)
+    return false;
+
+  this.r = new bn(data.slice(4, 4 + rlen));
+  this.s = new bn(data.slice(4 + rlen + 2, 4 + rlen + 2 + slen));
+
+  return true;
+};
+
+Signature.prototype.toDER = function toDER(enc) {
+  var r = this.r.toArray();
+  var s = this.s.toArray();
+
+  // Pad values
+  if (r[0] & 0x80)
+    r = [ 0 ].concat(r);
+  // Pad values
+  if (s[0] & 0x80)
+    s = [ 0 ].concat(s);
+
+  var total = r.length + s.length + 4;
+  var res = [ 0x30, total, 0x02, r.length ];
+  res = res.concat(r, [ 0x02, s.length ], s);
+  return utils.encode(res, enc);
+};
+
+},{"../../elliptic":1,"assert":15,"bn.js":14}],11:[function(_dereq_,module,exports){
+var assert = _dereq_('assert');
+
+var hash = _dereq_('hash.js');
+var elliptic = _dereq_('../elliptic');
+var utils = elliptic.utils;
+
+function HmacDRBG(options) {
+  if (!(this instanceof HmacDRBG))
+    return new HmacDRBG(options);
+  this.hash = options.hash;
+  this.predResist = !!options.predResist;
+
+  this.outLen = this.hash.outSize;
+  this.minEntropy = options.minEntropy || this.hash.hmacStrength;
+
+  this.reseed = null;
+  this.reseedInterval = null;
+  this.K = null;
+  this.V = null;
+
+  var entropy = utils.toArray(options.entropy, options.entropyEnc);
+  var nonce = utils.toArray(options.nonce, options.nonceEnc);
+  var pers = utils.toArray(options.pers, options.persEnc);
+  assert(entropy.length >= (this.minEntropy / 8),
+         'Not enough entropy. Minimum is: ' + this.minEntropy + ' bits');
+  this._init(entropy, nonce, pers);
+}
+module.exports = HmacDRBG;
+
+HmacDRBG.prototype._init = function init(entropy, nonce, pers) {
+  var seed = entropy.concat(nonce).concat(pers);
+
+  this.K = new Array(this.outLen / 8);
+  this.V = new Array(this.outLen / 8);
+  for (var i = 0; i < this.V.length; i++) {
+    this.K[i] = 0x00;
+    this.V[i] = 0x01;
+  }
+
+  this._update(seed);
+  this.reseed = 1;
+  this.reseedInterval = 0x1000000000000;  // 2^48
+};
+
+HmacDRBG.prototype._hmac = function hmac() {
+  return new hash.hmac(this.hash, this.K);
+};
+
+HmacDRBG.prototype._update = function update(seed) {
+  var kmac = this._hmac()
+                 .update(this.V)
+                 .update([ 0x00 ]);
+  if (seed)
+    kmac = kmac.update(seed);
+  this.K = kmac.digest();
+  this.V = this._hmac().update(this.V).digest();
+  if (!seed)
+    return;
+
+  this.K = this._hmac()
+               .update(this.V)
+               .update([ 0x01 ])
+               .update(seed)
+               .digest();
+  this.V = this._hmac().update(this.V).digest();
+};
+
+HmacDRBG.prototype.reseed = function reseed(entropy, entropyEnc, add, addEnc) {
+  // Optional entropy enc
+  if (typeof entropyEnc !== 'string') {
+    addEnc = add;
+    add = entropyEnc;
+    entropyEnc = null;
+  }
+
+  entropy = utils.toBuffer(entropy, entropyEnc);
+  add = utils.toBuffer(add, addEnc);
+
+  assert(entropy.length >= (this.minEntropy / 8),
+         'Not enough entropy. Minimum is: ' + this.minEntropy + ' bits');
+
+  this._update(entropy.concat(add || []));
+  this.reseed = 1;
+};
+
+HmacDRBG.prototype.generate = function generate(len, enc, add, addEnc) {
+  if (this.reseed > this.reseedInterval)
+    throw new Error('Reseed is required');
+
+  // Optional encoding
+  if (typeof enc !== 'string') {
+    addEnc = add;
+    add = enc;
+    enc = null;
+  }
+
+  // Optional additional data
+  if (add) {
+    add = utils.toArray(add, addEnc);
+    this._update(add);
+  }
+
+  var temp = [];
+  while (temp.length < len) {
+    this.V = this._hmac().update(this.V).digest();
+    temp = temp.concat(this.V);
+  }
+
+  var res = temp.slice(0, len);
+  this._update(add);
+  this.reseed++;
+  return utils.encode(res, enc);
+};
+
+},{"../elliptic":1,"assert":15,"hash.js":20}],12:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var elliptic = _dereq_('../elliptic');
 
@@ -2574,7 +3201,7 @@ if (typeof window === 'object') {
   };
 }
 
-},{"../elliptic":1,"assert":11}],9:[function(_dereq_,module,exports){
+},{"../elliptic":1,"assert":15}],13:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 
 var utils = exports;
@@ -2634,7 +3261,37 @@ function zero2(word) {
 }
 utils.zero2 = zero2;
 
-},{"assert":11}],10:[function(_dereq_,module,exports){
+function getNAF(num, w) {
+  // Represent k in a w-NAF form
+  var naf = [];
+  var ws = 1 << w;
+  var k = num.clone();
+  while (k.cmpn(1) >= 0) {
+    var z;
+    if (k.isOdd()) {
+      var mod = k.andln(ws - 1);
+      if (mod > (ws >> 1) - 1)
+        z = (ws >> 1) - mod;
+      else
+        z = mod;
+      k.isubn(z);
+    } else {
+      z = 0;
+    }
+    naf.push(z);
+
+    // Optimization, shift by word if possible
+    var shift = (k.cmpn(0) !== 0 && k.andln(ws - 1) === 0) ? w : 1;
+    for (var i = 1; i < shift; i++)
+      naf.push(0);
+    k.ishrn(shift);
+  }
+
+  return naf;
+}
+utils.getNAF = getNAF;
+
+},{"assert":15}],14:[function(_dereq_,module,exports){
 // Utils
 
 function assert(val, msg) {
@@ -2820,6 +3477,10 @@ BN.prototype.clone = function clone() {
 BN.prototype.strip = function strip() {
   while (this.length > 1 && this.words[this.length - 1] === 0)
     this.length--;
+  return this._normSign();
+};
+
+BN.prototype._normSign = function _normSign() {
   // -0 = 0
   if (this.length === 1 && this.words[0] === 0)
     this.sign = false;
@@ -3026,14 +3687,14 @@ BN.prototype.iadd = function iadd(num) {
     this.sign = false;
     var r = this.isub(num);
     this.sign = !this.sign;
-    return this;
+    return this._normSign();
 
   // positive + negative
   } else if (!this.sign && num.sign) {
     num.sign = false;
     var r = this.isub(num);
     num.sign = true;
-    return r;
+    return r._normSign();
   }
 
   // a.length > b.length
@@ -3099,14 +3760,14 @@ BN.prototype.isub = function isub(num) {
     num.sign = false;
     var r = this.iadd(num);
     num.sign = true;
-    return r;
+    return r._normSign();
 
   // -this - num = -(this + num)
   } else if (this.sign) {
     this.sign = false;
     this.iadd(num);
     this.sign = true;
-    return this;
+    return this._normSign();
   }
 
   // At this point both numbers are positive
@@ -3626,10 +4287,9 @@ BN.prototype._egcd = function _egcd(x1, p) {
     a = a.mod(p);
   else
     a = a.clone();
-  assert(a.cmpn(0) !== 0);
 
   var x2 = new BN(0);
-  while (a.cmpn(1) !== 0 && b.cmpn(1) !== 0) {
+  while (a.cmpn(1) > 0 && b.cmpn(1) > 0) {
     while (a.isEven()) {
       a.ishrn(1);
       if (x1.isEven())
@@ -3879,7 +4539,8 @@ BN.prototype.redPow = function redPow(num) {
 var primes = {
   k256: null,
   p224: null,
-  p192: null
+  p192: null,
+  p25519: null
 };
 
 // Pseudo-Mersenne prime
@@ -3943,6 +4604,14 @@ function P192() {
 }
 inherits(P192, MPrime);
 
+function P25519() {
+  // 2 ^ 255 - 19
+  MPrime.call(
+    this,
+    '7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed');
+}
+inherits(P25519, MPrime);
+
 // Exported mostly for testing purposes, use plain name instead
 BN._prime = function prime(name) {
   // Cached version of prime
@@ -3956,6 +4625,8 @@ BN._prime = function prime(name) {
     prime = new P224();
   else if (name === 'p192')
     prime = new P192();
+  else if (name === 'p25519')
+    prime = new P25519();
   else
     throw new Error('Unknown prime ' + name);
   primes[name] = prime;
@@ -4060,7 +4731,8 @@ Red.prototype.sqr = function sqr(a) {
 };
 
 Red.prototype.sqrt = function sqrt(a) {
-  assert(a.cmpn(0) !== 0);
+  if (a.cmpn(0) === 0)
+    return a.clone();
 
   var mod3 = this.m.andln(3);
   assert(mod3 % 2 === 1);
@@ -4116,10 +4788,12 @@ Red.prototype.sqrt = function sqrt(a) {
 
 Red.prototype.invm = function invm(a) {
   var inv = a._egcd(new BN(1), this.m);
-  if (inv.sign)
+  if (inv.sign) {
+    inv.sign = false;
     return this.imod(inv).redNeg();
-  else
+  } else {
     return this.imod(inv);
+  }
 };
 
 Red.prototype.pow = function pow(a, num) {
@@ -4235,7 +4909,7 @@ Mont.prototype.invm = function invm(a) {
   return res._forceRed(this);
 };
 
-},{}],11:[function(_dereq_,module,exports){
+},{}],15:[function(_dereq_,module,exports){
 // http://wiki.commonjs.org/wiki/Unit_Testing/1.0
 //
 // THIS IS NOT TESTED NOR LIKELY TO WORK OUTSIDE V8!
@@ -4597,7 +5271,7 @@ var objectKeys = Object.keys || function (obj) {
   return keys;
 };
 
-},{"util/":14}],12:[function(_dereq_,module,exports){
+},{"util/":18}],16:[function(_dereq_,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -4622,14 +5296,14 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],13:[function(_dereq_,module,exports){
+},{}],17:[function(_dereq_,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],14:[function(_dereq_,module,exports){
+},{}],18:[function(_dereq_,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -5219,7 +5893,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,_dereq_("/Users/indutny/Code/indutny/elliptic/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"),typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":13,"/Users/indutny/Code/indutny/elliptic/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":15,"inherits":12}],15:[function(_dereq_,module,exports){
+},{"./support/isBuffer":17,"/Users/indutny/Code/indutny/elliptic/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":19,"inherits":16}],19:[function(_dereq_,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -5281,7 +5955,7 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}],16:[function(_dereq_,module,exports){
+},{}],20:[function(_dereq_,module,exports){
 var hash = exports;
 
 hash.utils = _dereq_('./hash/utils');
@@ -5295,7 +5969,7 @@ hash.sha256 = hash.sha.sha256;
 hash.sha224 = hash.sha.sha224;
 hash.ripemd160 = hash.ripemd.ripemd160;
 
-},{"./hash/common":17,"./hash/hmac":18,"./hash/ripemd":19,"./hash/sha":20,"./hash/utils":21}],17:[function(_dereq_,module,exports){
+},{"./hash/common":21,"./hash/hmac":22,"./hash/ripemd":23,"./hash/sha":24,"./hash/utils":25}],21:[function(_dereq_,module,exports){
 var hash = _dereq_('../hash');
 var utils = hash.utils;
 var assert = utils.assert;
@@ -5378,7 +6052,7 @@ BlockHash.prototype._pad = function pad() {
   return res;
 }
 
-},{"../hash":16}],18:[function(_dereq_,module,exports){
+},{"../hash":20}],22:[function(_dereq_,module,exports){
 var hmac = exports;
 
 var hash = _dereq_('../hash');
@@ -5427,7 +6101,7 @@ Hmac.prototype.digest = function digest(enc) {
   return this.hash.outer.digest(enc);
 };
 
-},{"../hash":16}],19:[function(_dereq_,module,exports){
+},{"../hash":20}],23:[function(_dereq_,module,exports){
 var hash = _dereq_('../hash');
 var utils = hash.utils;
 
@@ -5572,7 +6246,7 @@ var sh = [
   8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11
 ];
 
-},{"../hash":16}],20:[function(_dereq_,module,exports){
+},{"../hash":20}],24:[function(_dereq_,module,exports){
 var hash = _dereq_('../hash');
 var utils = hash.utils;
 var assert = utils.assert;
@@ -5713,7 +6387,7 @@ function g1_256(x) {
   return rotr32(x, 17) ^ rotr32(x, 19) ^ (x >>> 10);
 }
 
-},{"../hash":16}],21:[function(_dereq_,module,exports){
+},{"../hash":20}],25:[function(_dereq_,module,exports){
 var utils = exports;
 
 function toArray(msg, enc) {
@@ -5912,10 +6586,12 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],22:[function(_dereq_,module,exports){
+},{}],26:[function(_dereq_,module,exports){
+module.exports=_dereq_(16)
+},{}],27:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
@@ -5942,8 +6618,9 @@ module.exports={
     "mocha": "^1.18.2"
   },
   "dependencies": {
-    "bn.js": "^0.10.1",
+    "bn.js": "^0.11.2",
     "hash.js": "^0.2.0",
+    "inherits": "^2.0.1",
     "uglify-js": "^2.4.13"
   }
 }
