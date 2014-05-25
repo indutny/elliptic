@@ -46,7 +46,7 @@ function start() {
 var str = 'big benchmark against elliptic';
 
 var m1 = hash.sha256().update(str).digest();
-var c1 = elliptic.ecdsa(elliptic.nist.secp256k1);
+var c1 = elliptic.ec(elliptic.curves.secp256k1);
 var k1 = c1.genKeyPair();
 var s1 = c1.sign(m1, k1);
 assert(c1.verify(m1, s1, k1));
@@ -73,6 +73,10 @@ add('gen', function() {
   c1.genKeyPair().getPublic();
 }, function() {
   eccjs.sjcl.ecc.ecdsa.generateKeys(c2, 0);
+});
+
+add('ecdh', function() {
+  c1.genKeyPair().derive(k1.getPublic());
 });
 
 start();

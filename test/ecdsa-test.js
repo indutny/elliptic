@@ -7,7 +7,7 @@ describe('ECDSA', function() {
     var curve = elliptic.curves.secp256k1;
     assert(curve);
 
-    var ecdsa = new elliptic.ecdsa(curve);
+    var ecdsa = new elliptic.ec(curve);
     var keys = ecdsa.genKeyPair({
       entropy: [
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
@@ -57,7 +57,7 @@ describe('ECDSA', function() {
   describe('RFC6979 vector', function() {
     function test(opt) {
       opt.cases.forEach(function(c) {
-        var ecdsa = elliptic.ecdsa({
+        var ecdsa = elliptic.ec({
           curve: opt.curve,
           hash: c.hash
         });
@@ -189,7 +189,7 @@ describe('ECDSA', function() {
     var curve = elliptic.curves.secp256k1;
     assert(curve);
 
-    var ecdsa = new elliptic.ecdsa(curve);
+    var ecdsa = new elliptic.ec(curve);
     var keys = ecdsa.genKeyPair({
       pers: 'my.pers.string',
       entropy: hash.sha256().update('hello world').digest()
