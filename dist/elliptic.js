@@ -6591,7 +6591,7 @@ module.exports=_dereq_(16)
 },{}],27:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
