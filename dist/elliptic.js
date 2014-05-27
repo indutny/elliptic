@@ -1273,39 +1273,6 @@ Point.prototype.getY = function getY() {
   return this.y.fromRed();
 };
 
-// Hybrid Binary-Ternary Joint Sparse Form
-function HBTJSF(k1, k2) {
-  var hbt1 = [];
-  var hbt2 = [];
-  var base = [];
-  while (k1.cmpn(0) > 0 || k2.cmpn(0) > 0) {
-    var b = 2;
-    var h1 = 0;
-    var h2 = 0;
-    if (k1.modn(3) === 0 && k2.modn(3) === 0) {
-      b = 3;
-      k1.idivn(3);
-      k2.idivn(3);
-    } else if (k1.andln(1) === 0 && k2.andln(1) === 0) {
-      k1.ishrn(1);
-      k2.ishrn(1);
-    } else {
-      h1 = k1.modn(6);
-      h2 = k2.modn(6);
-      if (h1 > 3)
-        h1 = h1 - 6;
-      if (h2 > 3)
-        h2 = h2 - 6;
-      k1.isubn(h1).ishrn(1);
-      k2.isubn(h2).ishrn(1);
-    }
-    base.push(b);
-    hbt1.push(h1);
-    hbt2.push(h2);
-  }
-  return { h1: hbt1, h2: hbt2, base: base };
-}
-
 Point.prototype.mul = function mul(k) {
   k = new bn(k, 16);
 
@@ -1315,80 +1282,6 @@ Point.prototype.mul = function mul(k) {
     return this.curve._endoWnafMulAdd([ this ], [ k ]);
   else
     return this.curve._wnafMul(this, k);
-};
-
-function HBTWindow(curve, p1, p2) {
-  this.curve = curve;
-  this.p1 = p1;
-  this.p2 = p2;
-
-  this.cache = new Array(25);
-}
-
-HBTWindow.prototype.get = function(k1, k2) {
-  if (k1 === 0 && k2 === 0)
-    return this.curve.point(null, null, null);
-
-  var index = (k1 + 2) * 6 + (k2 + 2);
-  if (this.cache[index])
-    return this.cache[index];
-
-  var acc = this.curve.point(null, null, null);
-  if (k1 === 3)
-    acc = acc.add(this.p1.dbl().add(this.p1));
-  else if (k1 === 2)
-    acc = acc.add(this.p1.dbl());
-  else if (k1 === 1)
-    acc = acc.add(this.p1);
-  else if (k1 === -1)
-    acc = acc.add(this.p1.neg());
-  else if (k1 === -2)
-    acc = acc.add(this.p1.dbl().neg());
-
-  if (k2 === 3)
-    acc = acc.add(this.p2.dbl().add(this.p2));
-  else if (k2 === 2)
-    acc = acc.add(this.p2.dbl());
-  else if (k2 === 1)
-    acc = acc.add(this.p2);
-  else if (k2 === -1)
-    acc = acc.add(this.p2.neg());
-  else if (k2 === -2)
-    acc = acc.add(this.p2.dbl().neg());
-
-  this.cache[index] = acc;
-
-  return acc;
-};
-
-Point.prototype._hbtMulAdd = function _hbtMulAdd(k1, p2, k2) {
-  assert.equal(p2.type, 'affine');
-
-  var hbt = HBTJSF(k1, k2);
-  var w = new HBTWindow(this.curve, this, p2);
-
-  var acc = this.curve.jpoint(null, null, null);
-  for (var i = hbt.h1.length - 1; i >= 0; ) {
-    var twos = 0;
-    var threes = 0;
-    do {
-      var h1 = hbt.h1[i];
-      var h2 = hbt.h2[i];
-      var base = hbt.base[i];
-
-      if (base === 2)
-        twos++;
-      else
-        threes++;
-      i--;
-    } while (i >= 0 && h1 === 0 && h2 === 0);
-
-    acc = acc.dblp(twos);
-    for (var j = 0; j < threes; j++)
-      acc = acc.trpl();
-    acc = acc.mixedAdd(w.get(h1, h2));
-  }
-  return acc.toP();
 };
 
 Point.prototype.mulAdd = function mulAdd(k1, p2, k2) {
@@ -4294,44 +4187,71 @@ BN.prototype.subn = function subn(num) {
   return this.clone().isubn(num);
 };
 
-BN.prototype._shiftDiv = function _shiftDiv(num, mode) {
-  // Find maximum Q, Q * num <= this
-  var shift = Math.max(0, this.bitLength() - num.bitLength());
-  var max = num.shln(shift);
-  if (shift > 0 && this.cmp(max) < 0) {
-    max.ishrn(1, shift);
-    shift--;
-  }
-  var maxLen = max.bitLength();
+BN.prototype._wordDiv = function _wordDiv(num, mode) {
+  var shift = this.length - num.length;
 
-  var c = this.clone();
-  if (mode === 'mod') {
-    var r = null;
-    while (c.cmp(num) >= 0) {
-      assert(shift >= 0);
-      if (c.cmp(max) >= 0)
-        c.isub(max);
-      var delta = Math.max(1, maxLen - c.bitLength());
-      max.ishrn(delta, shift);
-      maxLen -= delta;
-      shift -= delta;
+  var a = this.clone();
+  var b = num;
+
+  var q = mode !== 'mod' && new BN(0);
+  var sign = false;
+
+  // Approximate quotient at each step
+  while (a.length > b.length) {
+    // NOTE: a.length is always >= 2, because of the condition .div()
+    var hi = a.words[a.length - 1] * 0x4000000 + a.words[a.length - 2];
+    var sq = (hi / b.words[b.length - 1]);
+    var sqhi = (sq / 0x4000000) | 0;
+    var sqlo = sq & 0x3ffffff;
+    sq = new BN(null);
+    sq.words = [ sqlo, sqhi ];
+    sq.length = 2;
+
+    // Collect quotient
+    var shift = (a.length - b.length - 1) * 26;
+    if (q) {
+      var t = sq.shln(shift);
+      if (a.sign)
+        q.isub(t);
+      else
+        q.iadd(t);
     }
-  } else {
-    var r = new BN(0);
-    while (c.cmp(num) >= 0) {
-      assert(shift >= 0);
-      if (c.cmp(max) >= 0) {
-        c.isub(max);
-        r.bincn(shift);
-      }
-      var delta = Math.max(1, maxLen - c.bitLength());
-      max.ishrn(delta, shift);
-      maxLen -= delta;
-      shift -= delta;
+
+    sq = sq.mul(b).ishln(shift);
+    if (a.sign)
+      a.iadd(sq)
+    else
+      a.isub(sq);
+  }
+  // At this point a.length <= b.length
+  while (a.ucmp(b) >= 0) {
+    // NOTE: a.length is always >= 2, because of the condition above
+    var hi = a.words[a.length - 1];
+    var sq = new BN((hi / b.words[b.length - 1]) | 0);
+    var shift = (a.length - b.length) * 26;
+
+    if (q) {
+      var t = sq.shln(shift);
+      if (a.sign)
+        q.isub(t);
+      else
+        q.iadd(t);
     }
+
+    sq = sq.mul(b).ishln(shift);
+
+    if (a.sign)
+      a.iadd(sq);
+    else
+      a.isub(sq);
   }
 
-  return { mod: c, div: r };
+  if (a.sign) {
+    if (q)
+      q.isubn(1);
+    a.iadd(b);
+  }
+  return { div: q ? q : null, mod: a };
 };
 
 BN.prototype.divmod = function divmod(num, mode) {
@@ -4362,12 +4282,22 @@ BN.prototype.divmod = function divmod(num, mode) {
   // Both numbers are positive at this point
 
   // Strip both numbers to approximate shift value
-  this.strip();
-  num.strip();
   if (num.length > this.length || this.cmp(num) < 0)
     return { div: new BN(0), mod: this };
-  else
-    return this._shiftDiv(num, mode);
+
+  // Very short reduction
+  if (num.length === 1) {
+    if (mode === 'div')
+      return { div: this.divn(num.words[0]), mod: null };
+    else if (mode === 'mod')
+      return { div: null, mod: new BN(this.modn(num.words[0])) };
+    return {
+      div: this.divn(num.words[0]),
+      mod: new BN(this.modn(num.words[0]))
+    };
+  }
+
+  return this._wordDiv(num, mode);
 };
 
 // Find `this` / `num`
@@ -4427,6 +4357,10 @@ BN.prototype.idivn = function idivn(num) {
   return this.strip();
 };
 
+BN.prototype.divn = function divn(num) {
+  return this.clone().idivn(num);
+};
+
 BN.prototype._egcd = function _egcd(x1, p) {
   assert(!p.sign);
   assert(p.cmpn(0) !== 0);
@@ -4467,19 +4401,6 @@ BN.prototype._egcd = function _egcd(x1, p) {
     return x1;
   else
     return x2;
-};
-
-// New Algorithm for Classical Modular Inverse by R´obert L´orencz,
-// Springer 2003
-BN.prototype._lorenczInv = function _lorenczInv(p) {
-  var a = this;
-  var u = p;
-  var v = a;
-  var r = new BN(0);
-  var s = new BN(1);
-
-  var c_u = 0;
-  var c_v = 0;
 };
 
 // Invert number in the field F(num)
@@ -4567,14 +4488,20 @@ BN.prototype.cmp = function cmp(num) {
   else if (!this.sign && num.sign)
     return 1;
 
-  this.strip();
-  num.strip();
+  var res = this.ucmp(num);
+  if (this.sign)
+    return -res;
+  else
+    return res;
+};
 
+// Unsigned comparison
+BN.prototype.ucmp = function ucmp(num) {
   // At this point both numbers have the same sign
   if (this.length > num.length)
-    return this.sign ? -1 : 1;
+    return 1;
   else if (this.length < num.length)
-    return this.sign ? 1 : -1;
+    return -1;
 
   var res = 0;
   for (var i = this.length - 1; i >= 0; i--) {
@@ -4589,10 +4516,7 @@ BN.prototype.cmp = function cmp(num) {
       res = 1;
     break;
   }
-  if (this.sign)
-    return -res;
-  else
-    return res;
+  return res;
 };
 
 //
@@ -4743,6 +4667,8 @@ MPrime.prototype.ireduce = function ireduce(num) {
     r.length = 1;
   } else if (cmp > 0) {
     r.isub(this.p);
+  } else {
+    r.strip();
   }
 
   return r;
@@ -6794,7 +6720,7 @@ module.exports=_dereq_(16)
 },{}],27:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.15.2",
+  "version": "0.15.3",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
@@ -6821,7 +6747,7 @@ module.exports={
     "mocha": "^1.18.2"
   },
   "dependencies": {
-    "bn.js": "^0.11.2",
+    "bn.js": "^0.11.5",
     "hash.js": "^0.2.0",
     "inherits": "^2.0.1",
     "uglify-js": "^2.4.13"
