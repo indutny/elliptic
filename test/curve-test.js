@@ -39,7 +39,11 @@ describe('Curve', function() {
       a: '0',
       b: '7',
       n: 'ffffffff ffffffff ffffffff fffffffe ' +
-             'baaedce6 af48a03b bfd25e8c d0364141'
+             'baaedce6 af48a03b bfd25e8c d0364141',
+      g: [
+        '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+        '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
+      ]
     });
 
     var p = curve.point(
