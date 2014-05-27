@@ -17,6 +17,7 @@ var bn = _dereq_('bn.js');
 var elliptic = _dereq_('../../elliptic');
 
 var getNAF = elliptic.utils.getNAF;
+var getJSF = elliptic.utils.getJSF;
 
 function BaseCurve(type, conf) {
   this.type = type;
@@ -35,12 +36,10 @@ function BaseCurve(type, conf) {
   this.g = conf.g && this.pointFromJSON(conf.g, conf.gRed);
 
   // Temporary arrays
-  this.t1 = new Array(4);
-  this.t2 = new Array(4);
-  this.t3 = new Array(4);
-  this.t4 = new Array(4);
-  this.t5 = new Array(4);
-  this.t6 = new Array(4);
+  this._wnafT1 = new Array(4);
+  this._wnafT2 = new Array(4);
+  this._wnafT3 = new Array(4);
+  this._wnafT4 = new Array(4);
 }
 module.exports = BaseCurve;
 
@@ -55,7 +54,7 @@ BaseCurve.prototype.validate = function validate(point) {
 BaseCurve.prototype._fixedNafMul = function _fixedNafMul(p, k) {
   var doubles = p._getDoubles();
 
-  var naf = getNAF(k, 2);
+  var naf = getNAF(k, 1);
   var I = (1 << (doubles.step + 1)) - (doubles.step % 2 === 0 ? 2 : 1);
   I /= 3;
 
@@ -125,33 +124,89 @@ BaseCurve.prototype._wnafMul = function _wnafMul(p, k) {
   return p.type === 'affine' ? acc.toP() : acc;
 };
 
-BaseCurve.prototype._wnafMulAdd = function _wnafMulAdd(points, coeffs, len) {
-  var wndWidth = this.t1;
-  var wnd = this.t2;
-  var naf = this.t3;
+BaseCurve.prototype._wnafMulAdd = function _wnafMulAdd(defW,
+                                                       points,
+                                                       coeffs,
+                                                       len) {
+  var wndWidth = this._wnafT1;
+  var wnd = this._wnafT2;
+  var naf = this._wnafT3;
 
   // Fill all arrays
-  var defW = 2;
   var max = 0;
   for (var i = 0; i < len; i++) {
     var p = points[i];
     var nafPoints = p._getNAFPoints(defW);
     wndWidth[i] = nafPoints.wnd;
     wnd[i] = nafPoints.points;
-    naf[i] = getNAF(coeffs[i], nafPoints.wnd);
+  }
 
-    max = Math.max(naf[i].length, max);
+  // Comb small window NAFs
+  for (var i = len - 1; i >= 1; i -= 2) {
+    var a = i - 1;
+    var b = i;
+    if (wndWidth[a] !== 1 || wndWidth[b] !== 1) {
+      naf[a] = getNAF(coeffs[a], wndWidth[a]);
+      naf[b] = getNAF(coeffs[b], wndWidth[b]);
+      max = Math.max(naf[a].length, max);
+      max = Math.max(naf[b].length, max);
+      continue;
+    }
+
+    var comb = [
+      points[a], /* 1 */
+      null, /* 3 */
+      null, /* 5 */
+      points[b] /* 7 */
+    ];
+
+    // Try to avoid Projective points, if possible
+    if (points[a].y.cmp(points[b].y) === 0) {
+      comb[1] = points[a].add(points[b]);
+      comb[2] = points[a].toJ().mixedAdd(points[b].neg());
+    } else if (points[a].y.cmp(points[b].y.redNeg()) === 0) {
+      comb[1] = points[a].toJ().mixedAdd(points[b]);
+      comb[2] = points[a].add(points[b].neg());
+    } else {
+      comb[1] = points[a].toJ().mixedAdd(points[b]);
+      comb[2] = points[a].toJ().mixedAdd(points[b].neg());
+    }
+
+    var index = [
+      -3, /* -1 -1 */
+      -1, /* -1 0 */
+      -5, /* -1 1 */
+      -7, /* 0 -1 */
+      0, /* 0 0 */
+      7, /* 0 1 */
+      5, /* 1 -1 */
+      1, /* 1 0 */
+      3  /* 1 1 */
+    ];
+
+    var jsf = getJSF(coeffs[a], coeffs[b]);
+    max = Math.max(jsf[0].length, max);
+    naf[a] = new Array(max);
+    naf[b] = new Array(max);
+    for (var j = 0; j < max; j++) {
+      var ja = jsf[0][j] | 0;
+      var jb = jsf[1][j] | 0;
+
+      naf[a][j] = index[(ja + 1) * 3 + (jb + 1)];
+      naf[b][j] = 0;
+      wnd[a] = comb;
+    }
   }
 
   var acc = this.jpoint(null, null, null);
-  var tmp = this.t4;
+  var tmp = this._wnafT4;
   for (var i = max; i >= 0; i--) {
     var k = 0;
 
     while (i >= 0) {
       var zero = true;
       for (var j = 0; j < len; j++) {
-        tmp[j] = naf[j][i];
+        tmp[j] = naf[j][i] | 0;
         if (tmp[j] !== 0)
           zero = false;
       }
@@ -166,14 +221,25 @@ BaseCurve.prototype._wnafMulAdd = function _wnafMulAdd(points, coeffs, len) {
     if (i < 0)
       break;
 
-    for (var j = 0; j < tmp.length; j++) {
+    for (var j = 0; j < len; j++) {
       var z = tmp[j];
-      if (z > 0)
-        acc = acc.mixedAdd(wnd[j][(z - 1) >> 1]);
+      var p;
+      if (z === 0)
+        continue;
+      else if (z > 0)
+        p = wnd[j][(z - 1) >> 1];
       else if (z < 0)
-        acc = acc.mixedAdd(wnd[j][(-z - 1) >> 1].neg());
+        p = wnd[j][(-z - 1) >> 1].neg();
+
+      if (p.type === 'affine')
+        acc = acc.mixedAdd(p);
+      else
+        acc = acc.add(p);
     }
   }
+  // Zeroify references
+  for (var i = 0; i < len; i++)
+    wnd[i] = null;
   return acc.toP();
 };
 
@@ -228,7 +294,7 @@ BasePoint.prototype._getNAFPoints = function _getNAFPoints(wnd) {
     return this.precomputed.naf;
 
   var res = [ this ];
-  var max = (1 << (wnd - 1)) - 1;
+  var max = (1 << wnd) - 1;
   var dbl = max === 1 ? null : this.dbl();
   for (var i = 1; i < max; i++)
     res[i] = res[i - 1].add(dbl);
@@ -239,33 +305,7 @@ BasePoint.prototype._getNAFPoints = function _getNAFPoints(wnd) {
 };
 
 BasePoint.prototype._getBeta = function _getBeta() {
-  if (this.curve.type !== 'short' || !this.curve.endo)
-    return;
-
-  var pre = this.precomputed;
-  if (pre && pre.beta)
-    return pre.beta;
-
-  var beta = this.curve.point(this.x.redMul(this.curve.endo.beta), this.y);
-  if (pre) {
-    var curve = this.curve;
-    function endoMul(p) {
-      return curve.point(p.x.redMul(curve.endo.beta), p.y);
-    }
-    pre.beta = beta;
-    beta.precomputed = {
-      beta: null,
-      naf: pre.naf && {
-        wnd: pre.naf.wnd,
-        points: pre.naf.points.map(endoMul)
-      },
-      doubles: pre.doubles && {
-        step: pre.doubles.step,
-        points: pre.doubles.points.map(endoMul)
-      }
-    };
-  }
-  return beta;
+  return null;
 };
 
 BasePoint.prototype.dblp = function dblp(k) {
@@ -599,7 +639,7 @@ Point.prototype.mul = function mul(k) {
 };
 
 Point.prototype.mulAdd = function mulAdd(k1, p, k2) {
-  return this.curve._wnafMulAdd([ this, p ], [ k1, k2 ], 2);
+  return this.curve._wnafMulAdd(1, [ this, p ], [ k1, k2 ], 2);
 };
 
 Point.prototype.normalize = function normalize() {
@@ -833,20 +873,40 @@ function ShortCurve(conf) {
 
   // If the curve is endomorphic, precalculate beta and lambda
   this.endo = this._getEndomorphism(conf);
+  this._endoWnafT1 = new Array(4);
+  this._endoWnafT2 = new Array(4);
 }
 inherits(ShortCurve, Base);
 module.exports = ShortCurve;
 
 ShortCurve.prototype._getEndomorphism = function _getEndomorphism(conf) {
   // No efficient endomorphism
-  if (!this.zeroA || !this.n || this.p.modn(3) !== 1)
+  if (!this.zeroA || !this.g || !this.n || this.p.modn(3) !== 1)
     return;
 
   // Compute beta and lambda, that lambda * P = (beta * Px; Py)
-  var beta = conf.beta ? new bn(conf.beta, 16).toRed(this.red) :
-      this._getEndoRoot(this.p).toRed(this.red);
-  var lambda = conf.lambda ? new bn(conf.lambda, 16) :
-      this.n && this._getEndoRoot(this.n);
+  var beta;
+  var lambda;
+  if (conf.beta) {
+    beta = new bn(conf.beta, 16).toRed(this.red);
+  } else {
+    var betas = this._getEndoRoots(this.p);
+    // Choose the smallest beta
+    beta = betas[0].cmp(betas[1]) < 0 ? betas[0] : betas[1];
+    beta = beta.toRed(this.red);
+  }
+  if (conf.lambda) {
+    lambda = [ new bn(conf.lambda, 16) ];
+  } else {
+    // Choose the lambda that is matching selected beta
+    var lambdas = this._getEndoRoots(this.n);
+    if (this.g.mul(lambdas[0]).x.cmp(this.g.x.redMul(beta)) === 0) {
+      lambda = lambdas[0];
+    } else {
+      lambda = lambdas[1];
+      assert(this.g.mul(lambda).x.cmp(this.g.x.redMul(beta)) === 0);
+    }
+  }
 
   // Get basis vectors, used for balanced length-two representation
   var basis;
@@ -868,9 +928,9 @@ ShortCurve.prototype._getEndomorphism = function _getEndomorphism(conf) {
   };
 };
 
-ShortCurve.prototype._getEndoRoot = function _getEndoRoot(num) {
-  // Need to find smallest root for x^2 + x + 1 in F
-  // Lambda = (-1 +- Sqrt(-3)) / 2
+ShortCurve.prototype._getEndoRoots = function _getEndoRoots(num) {
+  // Find roots of for x^2 + x + 1 in F
+  // Root = (-1 +- Sqrt(-3)) / 2
   //
   var red = num === this.p ? this.red : bn.mont(num);
   var tinv = new bn(2).toRed(red).redInvm();
@@ -879,14 +939,9 @@ ShortCurve.prototype._getEndoRoot = function _getEndoRoot(num) {
 
   var s = new bn(3).toRed(red).redNeg().redSqrt().redMul(tinv);
 
-  // XXX: This seems to be a bit wrong... It should verify that
-  // lambda and beta are actually from one endomorphism
   var l1 = ntinv.redAdd(s).fromRed();
   var l2 = ntinv.redSub(s).fromRed();
-  if (l1.cmp(l2) < 0)
-    return l1;
-  else
-    return l2;
+  return [ l1, l2 ];
 };
 
 ShortCurve.prototype._getEndoBasis = function _getEndoBasis(lambda) {
@@ -1024,8 +1079,8 @@ ShortCurve.prototype.validate = function validate(point) {
 };
 
 ShortCurve.prototype._endoWnafMulAdd = function _endoWnafMulAdd(points, coeffs) {
-  var npoints = this.t5;
-  var ncoeffs = this.t6;
+  var npoints = this._endoWnafT1;
+  var ncoeffs = this._endoWnafT2;
   for (var i = 0; i < points.length; i++) {
     var split = this._endoSplit(coeffs[i]);
     var p = points[i];
@@ -1039,12 +1094,20 @@ ShortCurve.prototype._endoWnafMulAdd = function _endoWnafMulAdd(points, coeffs) 
       split.k2.sign = !split.k2.sign;
       beta = beta.neg(true);
     }
+
     npoints[i * 2] = p;
     npoints[i * 2 + 1] = beta;
     ncoeffs[i * 2] = split.k1;
     ncoeffs[i * 2 + 1] = split.k2;
   }
-  return this._wnafMulAdd(npoints, ncoeffs, points.length * 2);
+  var res = this._wnafMulAdd(1, npoints, ncoeffs, i * 2);
+
+  // Clean-up references to points and coefficients
+  for (var j = 0; j < i * 2; j++) {
+    npoints[j] = null;
+    ncoeffs[j] = null;
+  }
+  return res;
 };
 
 function Point(curve, x, y, isRed) {
@@ -1069,6 +1132,36 @@ function Point(curve, x, y, isRed) {
   }
 }
 inherits(Point, Base.BasePoint);
+
+Point.prototype._getBeta = function _getBeta() {
+  if (!this.curve.endo)
+    return;
+
+  var pre = this.precomputed;
+  if (pre && pre.beta)
+    return pre.beta;
+
+  var beta = this.curve.point(this.x.redMul(this.curve.endo.beta), this.y);
+  if (pre) {
+    var curve = this.curve;
+    function endoMul(p) {
+      return curve.point(p.x.redMul(curve.endo.beta), p.y);
+    }
+    pre.beta = beta;
+    beta.precomputed = {
+      beta: null,
+      naf: pre.naf && {
+        wnd: pre.naf.wnd,
+        points: pre.naf.points.map(endoMul)
+      },
+      doubles: pre.doubles && {
+        step: pre.doubles.step,
+        points: pre.doubles.points.map(endoMul)
+      }
+    };
+  }
+  return beta;
+};
 
 Point.prototype.toJSON = function toJSON() {
   if (!this.precomputed)
@@ -1144,7 +1237,9 @@ Point.prototype.add = function add(p) {
   if (this.x.cmp(p.x) === 0)
     return this.curve.point(null, null);
 
-  var c = this.y.redSub(p.y).redMul(this.x.redSub(p.x).redInvm());
+  var c = this.y.redSub(p.y);
+  if (c.cmpn(0) !== 0)
+    c = c.redMul(this.x.redSub(p.x).redInvm());
   var nx = c.redSqr().redISub(this.x).redISub(p.x);
   var ny = c.redMul(this.x.redSub(nx)).redISub(this.y);
   return this.curve.point(nx, ny);
@@ -1297,10 +1392,12 @@ Point.prototype._hbtMulAdd = function _hbtMulAdd(k1, p2, k2) {
 };
 
 Point.prototype.mulAdd = function mulAdd(k1, p2, k2) {
+  var points = [ this, p2 ];
+  var coeffs = [ k1, k2 ];
   if (this.curve.endo)
-    return this.curve._endoWnafMulAdd([ this, p2 ], [ k1, k2 ]);
+    return this.curve._endoWnafMulAdd(points, coeffs);
   else
-    return this.curve._wnafMulAdd([ this, p2 ], [ k1, k2 ], 2);
+    return this.curve._wnafMulAdd(1, points, coeffs, 2);
 };
 
 Point.prototype.eq = function eq(p) {
@@ -2172,7 +2269,7 @@ defineCurve('secp256k1', {
         ]
       },
       'naf': {
-        'wnd': 8,
+        'wnd': 7,
         'points': [
           [
             'f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9',
@@ -3203,6 +3300,7 @@ if (typeof window === 'object') {
 
 },{"../elliptic":1,"assert":15}],13:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
+var bn = _dereq_('bn.js');
 
 var utils = exports;
 
@@ -3261,10 +3359,10 @@ function zero2(word) {
 }
 utils.zero2 = zero2;
 
+// Represent num in a w-NAF form
 function getNAF(num, w) {
-  // Represent k in a w-NAF form
   var naf = [];
-  var ws = 1 << w;
+  var ws = 1 << (w + 1);
   var k = num.clone();
   while (k.cmpn(1) >= 0) {
     var z;
@@ -3281,7 +3379,7 @@ function getNAF(num, w) {
     naf.push(z);
 
     // Optimization, shift by word if possible
-    var shift = (k.cmpn(0) !== 0 && k.andln(ws - 1) === 0) ? w : 1;
+    var shift = (k.cmpn(0) !== 0 && k.andln(ws - 1) === 0) ? (w + 1) : 1;
     for (var i = 1; i < shift; i++)
       naf.push(0);
     k.ishrn(shift);
@@ -3291,7 +3389,64 @@ function getNAF(num, w) {
 }
 utils.getNAF = getNAF;
 
-},{"assert":15}],14:[function(_dereq_,module,exports){
+// Represent k1, k2 in a Joint Sparse Form
+function getJSF(k1, k2) {
+  var jsf = [
+    [],
+    []
+  ];
+
+  k1 = k1.clone();
+  k2 = k2.clone();
+  var d1 = 0;
+  var d2 = 0;
+  while (k1.cmpn(-d1) > 0 || k2.cmpn(-d2) > 0) {
+
+    // First phase
+    var m14 = (k1.andln(3) + d1) & 3;
+    var m24 = (k2.andln(3) + d2) & 3;
+    if (m14 === 3)
+      m14 = -1;
+    if (m24 === 3)
+      m24 = -1;
+    var u1;
+    if ((m14 & 1) === 0) {
+      u1 = 0;
+    } else {
+      var m8 = (k1.andln(7) + d1) & 7;
+      if ((m8 === 3 || m8 === 5) && m24 === 2)
+        u1 = -m14;
+      else
+        u1 = m14;
+    }
+    jsf[0].push(u1);
+
+    var u2;
+    if ((m24 & 1) === 0) {
+      u2 = 0;
+    } else {
+      var m8 = (k2.andln(7) + d2) & 7;
+      if ((m8 === 3 || m8 === 5) && m14 === 2)
+        u2 = -m24;
+      else
+        u2 = m24;
+    }
+    jsf[1].push(u2);
+
+    // Second phase
+    if (2 * d1 === u1 + 1)
+      d1 = 1 - d1;
+    if (2 * d2 === u2 + 1)
+      d2 = 1 - d2;
+    k1.ishrn(1);
+    k2.ishrn(1);
+  }
+
+  return jsf;
+}
+utils.getJSF = getJSF;
+
+},{"assert":15,"bn.js":14}],14:[function(_dereq_,module,exports){
 // Utils
 
 function assert(val, msg) {
@@ -3831,15 +3986,16 @@ BN.prototype.sub = function sub(num) {
 
 /*
 // NOTE: This could be potentionally used to generate loop-less multiplications
-function _genCombMulTo(len) {
+function _genCombMulTo(alen, blen) {
+  var len = alen + blen - 1;
   var src = [
     'var a = this.words, b = num.words, o = out.words, c = 0, w, ' +
         'mask = 0x3ffffff, shift = 0x4000000;',
-    'out.length = ' + (len * 2 - 1) + ';'
+    'out.length = ' + len + ';'
   ];
-  for (var k = 0; k < len * 2 - 1; k++) {
-    var minJ = Math.max(0, k - len + 1);
-    var maxJ = Math.min(k, len - 1);
+  for (var k = 0; k < len; k++) {
+    var minJ = Math.max(0, k - alen + 1);
+    var maxJ = Math.min(k, blen - 1);
 
     for (var j = minJ; j <= maxJ; j++) {
       var i = k - j;
@@ -4017,48 +4173,43 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
   var mask = 0x3ffffff ^ ((0x3ffffff >> r) << r);
   var maskedWords = extended;
 
-  if (s !== 0) {
-    hint -= s;
-    hint = Math.max(0, hint);
+  hint -= s;
+  hint = Math.max(0, hint);
 
-    // Extended mode, copy masked part
-    if (maskedWords) {
-      for (var i = 0; i < s; i++)
-        maskedWords.words[i] = this.words[i];
-      maskedWords.length = s;
-    }
-
-    for (var i = s; i <= this.length; i++)
-      this.words[i - s] = this.words[i];
-    if (i - s - 1 > 0) {
-      this.length = i - s - 1;
-    } else {
-      this.words[0] = 0;
-      this.length = 1;
-    }
+  // Extended mode, copy masked part
+  if (maskedWords) {
+    for (var i = 0; i < s; i++)
+      maskedWords.words[i] = this.words[i];
+    maskedWords.length = s;
   }
 
-  if (r !== 0) {
-    var carry = 0;
-    for (var i = this.length - 1; i >= 0 && (carry !== 0 || i >= hint); i--) {
-      var word = this.words[i];
-      this.words[i] = (carry << (26 - r)) | (this.words[i] >> r);
-      carry = word & mask;
-    }
-
-    // Push carried bits as a mask
-    if (maskedWords && carry !== 0)
-      maskedWords.words[maskedWords.length++] = carry;
+  for (var i = s; i <= this.length; i++)
+    this.words[i - s] = this.words[i];
+  if (i - s - 1 > 0) {
+    this.length = i - s - 1;
+  } else {
+    this.words[0] = 0;
+    this.length = 1;
   }
+
+  var carry = 0;
+  for (var i = this.length - 1; i >= 0 && (carry !== 0 || i >= hint); i--) {
+    var word = this.words[i];
+    this.words[i] = (carry << (26 - r)) | (this.words[i] >> r);
+    carry = word & mask;
+  }
+
+  // Push carried bits as a mask
+  if (maskedWords && carry !== 0)
+    maskedWords.words[maskedWords.length++] = carry;
 
   if (this.length === 0) {
     this.words[0] = 0;
     this.length = 1;
   }
 
-  if (extended) {
+  if (extended)
     return { hi: this.strip(), lo: maskedWords };
-  }
 
   return this.strip();
 };
@@ -4318,6 +4469,19 @@ BN.prototype._egcd = function _egcd(x1, p) {
     return x2;
 };
 
+// New Algorithm for Classical Modular Inverse by R´obert L´orencz,
+// Springer 2003
+BN.prototype._lorenczInv = function _lorenczInv(p) {
+  var a = this;
+  var u = p;
+  var v = a;
+  var r = new BN(0);
+  var s = new BN(1);
+
+  var c_u = 0;
+  var c_v = 0;
+};
+
 // Invert number in the field F(num)
 BN.prototype.invm = function invm(num) {
   return this._egcd(new BN(1), num).mod(num);
@@ -4544,8 +4708,9 @@ var primes = {
 };
 
 // Pseudo-Mersenne prime
-function MPrime(p) {
+function MPrime(name, p) {
   // P = 2 ^ N - K
+  this.name = name;
   this.p = new BN(p, 16);
   this.n = this.p.bitLength();
   this.k = new BN(1).ishln(this.n).isub(this.p);
@@ -4567,7 +4732,7 @@ MPrime.prototype.ireduce = function ireduce(num) {
 
   do {
     var pair = r.ishrn(this.n, 0, this.tmp);
-    r = pair.hi.imul(this.k);
+    r = this.imulK(pair.hi);
     r = r.iadd(pair.lo);
     rlen = r.bitLength();
   } while (rlen > this.n);
@@ -4583,16 +4748,52 @@ MPrime.prototype.ireduce = function ireduce(num) {
   return r;
 };
 
+MPrime.prototype.imulK = function imulK(num) {
+  return num.imul(this.k);
+};
+
 function K256() {
   MPrime.call(
     this,
+    'k256',
     'ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff fffffffe fffffc2f');
 }
 inherits(K256, MPrime);
 
+K256.prototype.imulK = function imulK(num) {
+  // K = 0x1000003d1 = [ 0x40, 0x3d1 ]
+  num.words[num.length] = 0;
+  num.words[num.length + 1] = 0;
+  num.length += 2;
+  for (var i = num.length - 3; i >= 0; i--) {
+    var w = num.words[i];
+    var hi = w * 0x40;
+    var lo = w * 0x3d1;
+    hi += (lo / 0x4000000) | 0;
+    var uhi = (hi / 0x4000000) | 0;
+    hi &= 0x3ffffff;
+    lo &= 0x3ffffff;
+
+    num.words[i + 2] += uhi;
+    num.words[i + 1] += hi;
+    num.words[i] = lo;
+  }
+  var w = num.words[num.length - 2];
+  if (w >= 0x4000000) {
+    num.words[num.length - 1] += w >>> 26;
+    num.words[num.length - 2] = w & 0x3ffffff;
+  }
+  if (num.words[num.length - 1] === 0)
+    num.length--;
+  if (num.words[num.length - 1] === 0)
+    num.length--;
+  return num;
+};
+
 function P224() {
   MPrime.call(
     this,
+    'p224',
     'ffffffff ffffffff ffffffff ffffffff 00000000 00000000 00000001');
 }
 inherits(P224, MPrime);
@@ -4600,6 +4801,7 @@ inherits(P224, MPrime);
 function P192() {
   MPrime.call(
     this,
+    'p192',
     'ffffffff ffffffff ffffffff fffffffe ffffffff ffffffff');
 }
 inherits(P192, MPrime);
@@ -4608,6 +4810,7 @@ function P25519() {
   // 2 ^ 255 - 19
   MPrime.call(
     this,
+    '25519',
     '7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed');
 }
 inherits(P25519, MPrime);
@@ -6591,7 +6794,7 @@ module.exports=_dereq_(16)
 },{}],27:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
