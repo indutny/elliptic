@@ -4076,10 +4076,12 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
     maskedWords.length = s;
   }
 
-  for (var i = s; i <= this.length; i++)
-    this.words[i - s] = this.words[i];
-  if (i - s - 1 > 0) {
-    this.length = i - s - 1;
+  if (s === 0) {
+    // No-op, we should not move anything at all
+  } else if (this.length > s) {
+    this.length -= s;
+    for (var i = 0; i < this.length; i++)
+      this.words[i] = this.words[i + s];
   } else {
     this.words[0] = 0;
     this.length = 1;
@@ -4101,10 +4103,11 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
     this.length = 1;
   }
 
+  this.strip();
   if (extended)
-    return { hi: this.strip(), lo: maskedWords };
+    return { hi: this, lo: maskedWords };
 
-  return this.strip();
+  return this;
 };
 
 // Shift-left
@@ -6720,7 +6723,7 @@ module.exports=_dereq_(16)
 },{}],27:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.15.3",
+  "version": "0.15.4",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
