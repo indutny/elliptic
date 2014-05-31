@@ -6723,7 +6723,7 @@ module.exports=_dereq_(16)
 },{}],27:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.15.4",
+  "version": "0.15.5",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
@@ -6750,7 +6750,7 @@ module.exports={
     "mocha": "^1.18.2"
   },
   "dependencies": {
-    "bn.js": "^0.11.5",
+    "bn.js": "^0.11.6",
     "hash.js": "^0.2.0",
     "inherits": "^2.0.1",
     "uglify-js": "^2.4.13"
