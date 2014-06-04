@@ -93,15 +93,14 @@ add('ecdh', {
 var cu1 = elliptic.ec('curve25519');
 var ku1 = cu1.genKeyPair();
 var kp2 = jodid.eddsa.genKeySeed();
-var ku2 = jodid.dh.publicKey(kp2);
 
-var s = jodid.dh.computeKey(jodid.eddsa.genKeySeed(), ku2);
 add('curve25519', {
   elliptic: function() {
     var s = ku1.derive(cu1.genKeyPair().getPublic());
   },
   jodid: function() {
-    var s = jodid.dh.computeKey(jodid.eddsa.genKeySeed(), ku2);
+    var s = jodid.dh.computeKey(kp2,
+                                jodid.dh.publicKey(jodid.eddsa.genKeySeed()));
   }
 });
 
