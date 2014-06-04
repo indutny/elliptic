@@ -3,21 +3,21 @@ var benchmark = require('benchmark');
 var hash = require('hash.js');
 var elliptic = require('../');
 var eccjs = require('eccjs');
+var jodid = require('./deps/jodid');
 
 var benchmarks = [];
 var maxTime = 10;
 
-function add(op, a, b, c) {
+function add(op, obj) {
   benchmarks.push({
     name: op,
     start: function start() {
       var suite = new benchmark.Suite;
 
       console.log('Benchmarking: ' + op);
-      if (a)
-        suite.add('elliptic#' + op, a, { maxTime: maxTime })
-      if (b)
-        suite.add('eccjs#' + op, b, { maxTime: maxTime })
+      Object.keys(obj).forEach(function(key) {
+        suite.add(key + '#' + op, obj[key], { maxTime: maxTime })
+      });
 
       suite
         .on('cycle', function(event) {
@@ -57,26 +57,52 @@ var k2 = eccjs.sjcl.ecc.ecdsa.generateKeys(c2, 0);
 var s2 = k2.sec.sign(m2, 0);
 assert(k2.pub.verify(m2, s2));
 
-add('sign', function() {
-  c1.sign(m1, k1);
-}, function() {
-  k2.sec.sign(m2, 0);
+add('sign', {
+  elliptic: function() {
+    c1.sign(m1, k1);
+  },
+  sjcl: function() {
+    k2.sec.sign(m2, 0);
+  }
 });
 
-add('verify', function() {
-  c1.verify(m1, s1, k1);
-}, function() {
-  k2.pub.verify(m2, s2);
+add('verify', {
+  elliptic: function() {
+    c1.verify(m1, s1, k1);
+  },
+  sjcl: function() {
+    k2.pub.verify(m2, s2);
+  }
 });
 
-add('gen', function() {
-  c1.genKeyPair().getPublic();
-}, function() {
-  eccjs.sjcl.ecc.ecdsa.generateKeys(c2, 0);
+add('gen', {
+  elliptic: function() {
+    c1.genKeyPair().getPublic();
+  },
+  sjcl: function() {
+    eccjs.sjcl.ecc.ecdsa.generateKeys(c2, 0);
+  }
 });
 
-add('ecdh', function() {
-  c1.genKeyPair().derive(k1.getPublic());
+add('ecdh', {
+  elliptic: function() {
+    c1.genKeyPair().derive(k1.getPublic());
+  }
+});
+
+var cu1 = elliptic.ec('curve25519');
+var ku1 = cu1.genKeyPair();
+var kp2 = jodid.eddsa.genKeySeed();
+var ku2 = jodid.dh.publicKey(kp2);
+
+var s = jodid.dh.computeKey(jodid.eddsa.genKeySeed(), ku2);
+add('curve25519', {
+  elliptic: function() {
+    var s = ku1.derive(cu1.genKeyPair().getPublic());
+  },
+  jodid: function() {
+    var s = jodid.dh.computeKey(jodid.eddsa.genKeySeed(), ku2);
+  }
 });
 
 start();
