@@ -1,5 +1,6 @@
 var assert = require('assert');
 var benchmark = require('benchmark');
+var crypto = require('crypto');
 var hash = require('hash.js');
 var elliptic = require('../');
 var eccjs = require('eccjs');
@@ -49,6 +50,14 @@ var m1 = hash.sha256().update(str).digest();
 var c1 = elliptic.ec(elliptic.curves.secp256k1);
 var k1 = c1.genKeyPair();
 var s1 = c1.sign(m1, k1);
+var ok = '-----BEGIN EC PARAMETERS-----\n' +
+         'BgUrgQQACg==\n' +
+         '-----END EC PARAMETERS-----\n' +
+         '-----BEGIN EC PRIVATE KEY-----\n' +
+         'MHQCAQEEIEWQfsvf8TdY+F2ziHut3Fl+LVdCHAQBLxeKn3v79M1LoAcGBSuBBAAK\n' +
+         'oUQDQgAEM7DB6MG6T5nGSwougzGIXVypXb81EerftCyqTc7v/rjmLobz5ZJHGALh\n' +
+         'ne+0Gdz5ZytFHQCTkUlU85Mz8SPjWg==\n' +
+         '-----END EC PRIVATE KEY-----';
 assert(c1.verify(m1, s1, k1));
 
 var m2 = eccjs.sjcl.hash.sha256.hash('big benchmark against elliptic');
@@ -63,15 +72,26 @@ add('sign', {
   },
   sjcl: function() {
     k2.sec.sign(m2, 0);
+  },
+  openssl: function() {
+    crypto.createSign('RSA-SHA256').update(str).sign(ok);
   }
 });
 
+var os1 = crypto.createSign('RSA-SHA256').update(str).sign(ok);
+var opk = '-----BEGIN PUBLIC KEY-----\n' +
+          'MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEM7DB6MG6T5nGSwougzGIXVypXb81Eerf\n' +
+          'tCyqTc7v/rjmLobz5ZJHGALhne+0Gdz5ZytFHQCTkUlU85Mz8SPjWg==\n' +
+          '-----END PUBLIC KEY-----';
 add('verify', {
   elliptic: function() {
     c1.verify(m1, s1, k1);
   },
   sjcl: function() {
     k2.pub.verify(m2, s2);
+  },
+  openssl: function() {
+    crypto.createVerify('RSA-SHA256').update(str).verify(opk, os1);
   }
 });
 
