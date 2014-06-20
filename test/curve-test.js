@@ -97,4 +97,24 @@ describe('Curve', function() {
     assert(p2.validate());
     assert(p1.eq(p2));
   });
+
+  describe('pointFromX', function() {
+    var fixtures = require('./fixtures/point')
+
+    fixtures.forEach(function(f) {
+      var params = elliptic.curves[f.curve]
+      if (!params) return // missing curve
+
+      var curve = params.curve
+
+      var x = new bn(f.x)
+      var odd = new bn(f.y).isOdd()
+
+      it('recovers point for curve ' + f.curve + ' correctly', function() {
+        var actual = curve.pointFromX(odd, x)
+        assert.equal(actual.getX().toString(), f.x)
+        assert.equal(actual.getY().toString(), f.y)
+      })
+    })
+  })
 });
