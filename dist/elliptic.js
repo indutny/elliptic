@@ -11,7 +11,7 @@ elliptic.curves = _dereq_('./elliptic/curves');
 // Protocols
 elliptic.ec = _dereq_('./elliptic/ec');
 
-},{"../package.json":27,"./elliptic/curve":4,"./elliptic/curves":7,"./elliptic/ec":8,"./elliptic/hmac-drbg":11,"./elliptic/rand":12,"./elliptic/utils":13}],2:[function(_dereq_,module,exports){
+},{"../package.json":26,"./elliptic/curve":4,"./elliptic/curves":7,"./elliptic/ec":8,"./elliptic/hmac-drbg":11,"./elliptic/rand":12,"./elliptic/utils":13}],2:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var bn = _dereq_('bn.js');
 var elliptic = _dereq_('../../elliptic');
@@ -678,7 +678,7 @@ Point.prototype.getY = function getY() {
 Point.prototype.toP = Point.prototype.normalize;
 Point.prototype.mixedAdd = Point.prototype.add;
 
-},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":26}],4:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":25}],4:[function(_dereq_,module,exports){
 var curve = exports;
 
 curve.base = _dereq_('./base');
@@ -851,7 +851,7 @@ Point.prototype.getX = function getX() {
   return this.x.fromRed();
 };
 
-},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":26}],6:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":25}],6:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var curve = _dereq_('../curve');
 var elliptic = _dereq_('../../elliptic');
@@ -896,7 +896,7 @@ ShortCurve.prototype._getEndomorphism = function _getEndomorphism(conf) {
     beta = beta.toRed(this.red);
   }
   if (conf.lambda) {
-    lambda = [ new bn(conf.lambda, 16) ];
+    lambda = new bn(conf.lambda, 16);
   } else {
     // Choose the lambda that is matching selected beta
     var lambdas = this._getEndoRoots(this.n);
@@ -1749,7 +1749,7 @@ JPoint.prototype.isInfinity = function isInfinity() {
   return this.z.cmpn(0) === 0;
 };
 
-},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":26}],7:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":25}],7:[function(_dereq_,module,exports){
 var curves = exports;
 
 var assert = _dereq_('assert');
@@ -2678,7 +2678,7 @@ defineCurve('secp256k1', {
   ]
 });
 
-},{"../elliptic":1,"assert":15,"bn.js":14,"hash.js":20}],8:[function(_dereq_,module,exports){
+},{"../elliptic":1,"assert":15,"bn.js":14,"hash.js":19}],8:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var bn = _dereq_('bn.js');
 var elliptic = _dereq_('../../elliptic');
@@ -2701,6 +2701,7 @@ function EC(options) {
 
   this.curve = options.curve.curve;
   this.n = this.curve.n;
+  this.nh = this.n.shrn(1);
   this.g = this.curve.g;
 
   // Point on curve
@@ -2750,9 +2751,11 @@ EC.prototype._truncateToN = function truncateToN(msg, truncOnly) {
     return msg;
 };
 
-EC.prototype.sign = function sign(msg, key) {
+EC.prototype.sign = function sign(msg, key, options) {
   key = this.keyPair(key, 'hex');
   msg = this._truncateToN(new bn(msg, 16));
+  if (!options)
+    options = {};
 
   // Zero-extend key to provide enough entropy
   var bytes = this.n.byteLength();
@@ -2791,6 +2794,10 @@ EC.prototype.sign = function sign(msg, key) {
     var s = k.invm(this.n).mul(r.mul(key.getPrivate()).iadd(msg)).mod(this.n);
     if (s.cmpn(0) === 0)
       continue;
+
+    // Use complement of `s`, if it is > `n / 2`
+    if (options.canonical && s.cmp(this.nh) > 0)
+      s = this.n.sub(s);
 
     return new Signature(r, s);
   } while (true);
@@ -3147,7 +3154,7 @@ HmacDRBG.prototype.generate = function generate(len, enc, add, addEnc) {
   return utils.encode(res, enc);
 };
 
-},{"../elliptic":1,"assert":15,"hash.js":20}],12:[function(_dereq_,module,exports){
+},{"../elliptic":1,"assert":15,"hash.js":19}],12:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var elliptic = _dereq_('../elliptic');
 
@@ -3409,7 +3416,7 @@ BN.prototype._init = function init(number, base) {
     for (var i = number.length - 1, j = 0; i >= 0; i -= 3) {
       var w = number[i] | (number[i - 1] << 8) | (number[i - 2] << 16);
       this.words[j] |= (w << off) & 0x3ffffff;
-      this.words[j + 1] = (w >> (26 - off)) & 0x3ffffff;
+      this.words[j + 1] = (w >>> (26 - off)) & 0x3ffffff;
       off += 24;
       if (off >= 26) {
         off -= 26;
@@ -3451,7 +3458,7 @@ BN.prototype._parseHex = function parseHex(number, start) {
   for (var i = number.length - 6, j = 0; i >= start; i -= 6) {
     var w = parseInt(number.slice(i, i + 6), 16);
     this.words[j] |= (w << off) & 0x3ffffff;
-    this.words[j + 1] |= w >> (26 - off) & 0x3fffff;
+    this.words[j + 1] |= w >>> (26 - off) & 0x3fffff;
     off += 24;
     if (off >= 26) {
       off -= 26;
@@ -3461,7 +3468,7 @@ BN.prototype._parseHex = function parseHex(number, start) {
   if (i + 6 !== start) {
     var w = parseInt(number.slice(start, i + 6), 16);
     this.words[j] |= (w << off) & 0x3ffffff;
-    this.words[j + 1] |= w >> (26 - off) & 0x3fffff;
+    this.words[j + 1] |= w >>> (26 - off) & 0x3fffff;
   }
   this.strip();
 };
@@ -3598,7 +3605,7 @@ BN.prototype.toString = function toString(base) {
     for (var i = 0; i < this.length; i++) {
       var w = this.words[i];
       var word = (((w << off) | carry) & 0xffffff).toString(16);
-      carry = (w >> (24 - off)) & 0xffffff;
+      carry = (w >>> (24 - off)) & 0xffffff;
       if (carry !== 0 || i !== this.length - 1)
         out = zero6(word) + out;
       else
@@ -3760,12 +3767,12 @@ BN.prototype.iadd = function iadd(num) {
   for (var i = 0; i < b.length; i++) {
     var r = a.words[i] + b.words[i] + carry;
     this.words[i] = r & 0x3ffffff;
-    carry = r >> 26;
+    carry = r >>> 26;
   }
   for (; carry !== 0 && i < a.length; i++) {
     var r = a.words[i] + carry;
     this.words[i] = r & 0x3ffffff;
-    carry = r >> 26;
+    carry = r >>> 26;
   }
 
   this.length = a.length;
@@ -3937,7 +3944,7 @@ BN.prototype.mulTo = function mulTo(num, out) {
       ncarry += (r / 0x4000000) | 0;
       lo += rword;
       rword = lo & 0x3ffffff;
-      ncarry += lo >> 26;
+      ncarry += lo >>> 26;
     }
     out.words[k] = rword;
     carry = ncarry;
@@ -3990,7 +3997,7 @@ BN.prototype.imul = function imul(num) {
       carry += (r / 0x4000000) | 0;
       lo += rword;
       rword = lo & 0x3ffffff;
-      carry += lo >> 26;
+      carry += lo >>> 26;
     }
     this.words[k] = rword;
     this.words[k + 1] += carry;
@@ -4023,7 +4030,7 @@ BN.prototype.ishln = function ishln(bits) {
   assert(typeof bits === 'number' && bits >= 0);
   var r = bits % 26;
   var s = (bits - r) / 26;
-  var carryMask = (0x3ffffff >> (26 - r)) << (26 - r);
+  var carryMask = (0x3ffffff >>> (26 - r)) << (26 - r);
 
   var o = this.clone();
   if (r !== 0) {
@@ -4032,7 +4039,7 @@ BN.prototype.ishln = function ishln(bits) {
       var newCarry = this.words[i] & carryMask;
       var c = (this.words[i] - newCarry) << r;
       this.words[i] = c | carry;
-      carry = newCarry >> (26 - r);
+      carry = newCarry >>> (26 - r);
     }
     if (carry) {
       this.words[i] = carry;
@@ -4063,7 +4070,7 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
 
   var r = bits % 26;
   var s = Math.min((bits - r) / 26, this.length);
-  var mask = 0x3ffffff ^ ((0x3ffffff >> r) << r);
+  var mask = 0x3ffffff ^ ((0x3ffffff >>> r) << r);
   var maskedWords = extended;
 
   hint -= s;
@@ -4090,7 +4097,7 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
   var carry = 0;
   for (var i = this.length - 1; i >= 0 && (carry !== 0 || i >= hint); i--) {
     var word = this.words[i];
-    this.words[i] = (carry << (26 - r)) | (this.words[i] >> r);
+    this.words[i] = (carry << (26 - r)) | (word >>> r);
     carry = word & mask;
   }
 
@@ -4133,7 +4140,7 @@ BN.prototype.imaskn = function imaskn(bits) {
   this.length = Math.min(s, this.length);
 
   if (r !== 0) {
-    var mask = 0x3ffffff ^ ((0x3ffffff >> r) << r);
+    var mask = 0x3ffffff ^ ((0x3ffffff >>> r) << r);
     this.words[this.length - 1] &= mask;
   }
 
@@ -4445,7 +4452,7 @@ BN.prototype.bincn = function bincn(bit) {
   for (var i = s; carry !== 0 && i < this.length; i++) {
     var w = this.words[i];
     w += carry;
-    carry = w >> 26;
+    carry = w >>> 26;
     w &= 0x3ffffff;
     this.words[i] = w;
   }
@@ -4743,6 +4750,22 @@ function P25519() {
     '7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed');
 }
 inherits(P25519, MPrime);
+
+P25519.prototype.imulK = function imulK(num) {
+  // K = 0x13
+  var carry = 0;
+  for (var i = 0; i < num.length; i++) {
+    var hi = num.words[i] * 0x13 + carry;
+    var lo = hi & 0x3ffffff;
+    hi >>>= 26;
+
+    num.words[i] = lo;
+    carry = hi;
+  }
+  if (carry !== 0)
+    num.words[num.length++] = carry;
+  return num;
+};
 
 // Exported mostly for testing purposes, use plain name instead
 BN._prime = function prime(name) {
@@ -5404,29 +5427,69 @@ var objectKeys = Object.keys || function (obj) {
 };
 
 },{"util/":18}],16:[function(_dereq_,module,exports){
-if (typeof Object.create === 'function') {
-  // implementation from standard node.js 'util' module
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    ctor.prototype = Object.create(superCtor.prototype, {
-      constructor: {
-        value: ctor,
-        enumerable: false,
-        writable: true,
-        configurable: true
-      }
-    });
-  };
-} else {
-  // old school shim for old browsers
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    var TempCtor = function () {}
-    TempCtor.prototype = superCtor.prototype
-    ctor.prototype = new TempCtor()
-    ctor.prototype.constructor = ctor
-  }
+// shim for using process in browser
+
+var process = module.exports = {};
+
+process.nextTick = (function () {
+    var canSetImmediate = typeof window !== 'undefined'
+    && window.setImmediate;
+    var canPost = typeof window !== 'undefined'
+    && window.postMessage && window.addEventListener
+    ;
+
+    if (canSetImmediate) {
+        return function (f) { return window.setImmediate(f) };
+    }
+
+    if (canPost) {
+        var queue = [];
+        window.addEventListener('message', function (ev) {
+            var source = ev.source;
+            if ((source === window || source === null) && ev.data === 'process-tick') {
+                ev.stopPropagation();
+                if (queue.length > 0) {
+                    var fn = queue.shift();
+                    fn();
+                }
+            }
+        }, true);
+
+        return function nextTick(fn) {
+            queue.push(fn);
+            window.postMessage('process-tick', '*');
+        };
+    }
+
+    return function nextTick(fn) {
+        setTimeout(fn, 0);
+    };
+})();
+
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
 }
+
+// TODO(shtylman)
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
 
 },{}],17:[function(_dereq_,module,exports){
 module.exports = function isBuffer(arg) {
@@ -6024,70 +6087,8 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-}).call(this,_dereq_("/Users/indutny/Code/indutny/elliptic/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js"),typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":17,"/Users/indutny/Code/indutny/elliptic/node_modules/browserify/node_modules/insert-module-globals/node_modules/process/browser.js":19,"inherits":16}],19:[function(_dereq_,module,exports){
-// shim for using process in browser
-
-var process = module.exports = {};
-
-process.nextTick = (function () {
-    var canSetImmediate = typeof window !== 'undefined'
-    && window.setImmediate;
-    var canPost = typeof window !== 'undefined'
-    && window.postMessage && window.addEventListener
-    ;
-
-    if (canSetImmediate) {
-        return function (f) { return window.setImmediate(f) };
-    }
-
-    if (canPost) {
-        var queue = [];
-        window.addEventListener('message', function (ev) {
-            var source = ev.source;
-            if ((source === window || source === null) && ev.data === 'process-tick') {
-                ev.stopPropagation();
-                if (queue.length > 0) {
-                    var fn = queue.shift();
-                    fn();
-                }
-            }
-        }, true);
-
-        return function nextTick(fn) {
-            queue.push(fn);
-            window.postMessage('process-tick', '*');
-        };
-    }
-
-    return function nextTick(fn) {
-        setTimeout(fn, 0);
-    };
-})();
-
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-
-function noop() {}
-
-process.on = noop;
-process.once = noop;
-process.off = noop;
-process.emit = noop;
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-}
-
-// TODO(shtylman)
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-
-},{}],20:[function(_dereq_,module,exports){
+}).call(this,_dereq_("FWaASH"),typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./support/isBuffer":17,"FWaASH":16,"inherits":25}],19:[function(_dereq_,module,exports){
 var hash = exports;
 
 hash.utils = _dereq_('./hash/utils');
@@ -6101,7 +6102,7 @@ hash.sha256 = hash.sha.sha256;
 hash.sha224 = hash.sha.sha224;
 hash.ripemd160 = hash.ripemd.ripemd160;
 
-},{"./hash/common":21,"./hash/hmac":22,"./hash/ripemd":23,"./hash/sha":24,"./hash/utils":25}],21:[function(_dereq_,module,exports){
+},{"./hash/common":20,"./hash/hmac":21,"./hash/ripemd":22,"./hash/sha":23,"./hash/utils":24}],20:[function(_dereq_,module,exports){
 var hash = _dereq_('../hash');
 var utils = hash.utils;
 var assert = utils.assert;
@@ -6184,7 +6185,7 @@ BlockHash.prototype._pad = function pad() {
   return res;
 }
 
-},{"../hash":20}],22:[function(_dereq_,module,exports){
+},{"../hash":19}],21:[function(_dereq_,module,exports){
 var hmac = exports;
 
 var hash = _dereq_('../hash');
@@ -6233,7 +6234,7 @@ Hmac.prototype.digest = function digest(enc) {
   return this.hash.outer.digest(enc);
 };
 
-},{"../hash":20}],23:[function(_dereq_,module,exports){
+},{"../hash":19}],22:[function(_dereq_,module,exports){
 var hash = _dereq_('../hash');
 var utils = hash.utils;
 
@@ -6378,7 +6379,7 @@ var sh = [
   8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11
 ];
 
-},{"../hash":20}],24:[function(_dereq_,module,exports){
+},{"../hash":19}],23:[function(_dereq_,module,exports){
 var hash = _dereq_('../hash');
 var utils = hash.utils;
 var assert = utils.assert;
@@ -6519,7 +6520,7 @@ function g1_256(x) {
   return rotr32(x, 17) ^ rotr32(x, 19) ^ (x >>> 10);
 }
 
-},{"../hash":20}],25:[function(_dereq_,module,exports){
+},{"../hash":19}],24:[function(_dereq_,module,exports){
 var utils = exports;
 
 function toArray(msg, enc) {
@@ -6718,12 +6719,35 @@ if (typeof Object.create === 'function') {
   }
 }
 
+},{}],25:[function(_dereq_,module,exports){
+if (typeof Object.create === 'function') {
+  // implementation from standard node.js 'util' module
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    ctor.prototype = Object.create(superCtor.prototype, {
+      constructor: {
+        value: ctor,
+        enumerable: false,
+        writable: true,
+        configurable: true
+      }
+    });
+  };
+} else {
+  // old school shim for old browsers
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    var TempCtor = function () {}
+    TempCtor.prototype = superCtor.prototype
+    ctor.prototype = new TempCtor()
+    ctor.prototype.constructor = ctor
+  }
+}
+
 },{}],26:[function(_dereq_,module,exports){
-module.exports=_dereq_(16)
-},{}],27:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.15.5",
+  "version": "0.15.8",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
@@ -6747,13 +6771,13 @@ module.exports={
   "homepage": "https://github.com/indutny/elliptic",
   "devDependencies": {
     "browserify": "^3.44.2",
-    "mocha": "^1.18.2"
+    "mocha": "^1.18.2",
+    "uglify-js": "^2.4.13"
   },
   "dependencies": {
     "bn.js": "^0.11.6",
     "hash.js": "^0.2.0",
-    "inherits": "^2.0.1",
-    "uglify-js": "^2.4.13"
+    "inherits": "^2.0.1"
   }
 }
 
