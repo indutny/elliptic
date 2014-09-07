@@ -3175,11 +3175,13 @@ Rand.prototype.generate = function generate(len) {
 };
 
 if (typeof window === 'object') {
-  if (window.crypto && window.crypto.getRandomValues) {
+  var getRandomValues = window.crypto && window.crypto.getRandomValues ||
+                        window.msCrypto && window.msCrypto.getRandomValues;
+  if (getRandomValues) {
     // Modern browsers
     Rand.prototype._rand = function _rand(n) {
       var arr = new Uint8Array(n);
-      window.crypto.getRandomValues(arr);
+      getRandomValues(arr);
       return arr;
     };
   } else {
@@ -6747,7 +6749,7 @@ if (typeof Object.create === 'function') {
 },{}],26:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.15.8",
+  "version": "0.15.9",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
