@@ -3396,7 +3396,8 @@ function BN(number, base) {
   if (number !== null)
     this._init(number || 0, base || 10);
 }
-module.exports = BN;
+if (typeof module === 'object')
+  module.exports = BN;
 
 BN.BN = BN;
 BN.wordSize = 26;
@@ -3407,8 +3408,16 @@ BN.prototype._init = function init(number, base) {
       this.sign = true;
       number = -number;
     }
-    this.words = [ number & 0x3ffffff ];
-    this.length = 1;
+    if (number < 0x4000000) {
+      this.words = [ number & 0x3ffffff ];
+      this.length = 1;
+    } else {
+      this.words = [
+        number & 0x3ffffff,
+        (number / 0x4000000) & 0x3ffffff
+      ];
+      this.length = 2;
+    }
     return;
   } else if (typeof number === 'object') {
     // Perhaps a Uint8Array
@@ -3435,7 +3444,7 @@ BN.prototype._init = function init(number, base) {
   }
   if (base === 'hex')
     base = 16;
-  assert(base <= 16);
+  assert(base === (base | 0) && base >= 2 && base <= 36);
 
   number = number.toString().replace(/\s+/g, '');
   var start = 0;
@@ -3554,54 +3563,82 @@ BN.prototype.inspect = function inspect() {
 };
 
 /*
-function _zero(n) {
-  var code = '';
-  for (var i = n - 1; i > 0; i--) {
-    var pad = '';
-    for (var j = 0; j < n - i; j++)
-      pad += '0';
-    code += 'if (w.length === ' + i + ') return \'' + pad + '\' + w;\n';
-  }
-  code += 'return w';
 
-  return new Function('w', code);
+var zeros = [];
+var groupSizes = [];
+var groupBases = [];
+
+var s = '';
+var i = -1;
+while (++i < BN.wordSize) {
+  zeros[i] = s;
+  s += '0';
+}
+groupSizes[0] = 0;
+groupSizes[1] = 0;
+groupBases[0] = 0;
+groupBases[1] = 0;
+var base = 2 - 1;
+while (++base < 36 + 1) {
+  var groupSize = 0;
+  var groupBase = 1;
+  // TODO: <=
+  while (groupBase < (1 << BN.wordSize) / base) {
+    groupBase *= base;
+    groupSize += 1;
+  }
+  groupSizes[base] = groupSize;
+  groupBases[base] = groupBase;
 }
 
-var zero6 = _zero(6);
-var zero14 = _zero(14);
 */
 
-// Sadly chrome apps could not contain `new Function()` calls
-function zero6(w) {
-  if (w.length === 5) return '0' + w;
-  if (w.length === 4) return '00' + w;
-  if (w.length === 3) return '000' + w;
-  if (w.length === 2) return '0000' + w;
-  if (w.length === 1) return '00000' + w;
-  return w;
-}
+var zeros = [
+  '',
+  '0',
+  '00',
+  '000',
+  '0000',
+  '00000',
+  '000000',
+  '0000000',
+  '00000000',
+  '000000000',
+  '0000000000',
+  '00000000000',
+  '000000000000',
+  '0000000000000',
+  '00000000000000',
+  '000000000000000',
+  '0000000000000000',
+  '00000000000000000',
+  '000000000000000000',
+  '0000000000000000000',
+  '00000000000000000000',
+  '000000000000000000000',
+  '0000000000000000000000',
+  '00000000000000000000000',
+  '000000000000000000000000',
+  '0000000000000000000000000'
+];
 
-function zero14(w) {
-  if (w.length === 13) return '0' + w;
-  if (w.length === 12) return '00' + w;
-  if (w.length === 11) return '000' + w;
-  if (w.length === 10) return '0000' + w;
-  if (w.length === 9) return '00000' + w;
-  if (w.length === 8) return '000000' + w;
-  if (w.length === 7) return '0000000' + w;
-  if (w.length === 6) return '00000000' + w;
-  if (w.length === 5) return '000000000' + w;
-  if (w.length === 4) return '0000000000' + w;
-  if (w.length === 3) return '00000000000' + w;
-  if (w.length === 2) return '000000000000' + w;
-  if (w.length === 1) return '0000000000000' + w;
-  return w;
-}
+var groupSizes = [
+  0, 0,
+  25, 16, 12, 11, 10, 9, 8,
+  8, 7, 7, 7, 7, 6, 6,
+  6, 6, 6, 6, 6, 5, 5,
+  5, 5, 5, 5, 5, 5, 5,
+  5, 5, 5, 5, 5, 5, 5
+];
 
-// Precomputed divisor for `.toString(10)` = 10 ^ 14
-var div10 = new BN(null);
-div10.words = [ 0x7a4000, 0x16bcc4 ];
-div10.length = 2;
+var groupBases = [
+  0, 0,
+  33554432, 43046721, 16777216, 48828125, 60466176, 40353607, 16777216,
+  43046721, 10000000, 19487171, 35831808, 62748517, 7529536, 11390625,
+  16777216, 24137569, 34012224, 47045881, 64000000, 4084101, 5153632,
+  6436343, 7962624, 9765625, 11881376, 14348907, 17210368, 20511149,
+  24300000, 28629151, 33554432, 39135393, 45435424, 52521875, 60466176
+];
 
 BN.prototype.toString = function toString(base) {
   base = base || 10;
@@ -3614,7 +3651,7 @@ BN.prototype.toString = function toString(base) {
       var word = (((w << off) | carry) & 0xffffff).toString(16);
       carry = (w >>> (24 - off)) & 0xffffff;
       if (carry !== 0 || i !== this.length - 1)
-        out = zero6(word) + out;
+        out = zeros[6 - word.length] + word + out;
       else
         out = word + out;
       off += 2;
@@ -3628,16 +3665,20 @@ BN.prototype.toString = function toString(base) {
     if (this.sign)
       out = '-' + out;
     return out;
-  } else if (base === 10) {
+  } else if (base === (base | 0) && base >= 2 && base <= 36) {
+    // var groupSize = Math.floor(BN.wordSize * Math.LN2 / Math.log(base));
+    var groupSize = groupSizes[base];
+    // var groupBase = Math.pow(base, groupSize);
+    var groupBase = groupBases[base];
     var out = '';
     var c = this.clone();
     c.sign = false;
     while (c.cmpn(0) !== 0) {
-      var r = c.modn(1000000);
-      c = c.idivn(1000000);
+      var r = c.modn(groupBase).toString(base);
+      c = c.idivn(groupBase);
 
       if (c.cmpn(0) !== 0)
-        out = zero6(r + '') + out;
+        out = zeros[groupSize - r.length] + r + out;
       else
         out = r + out;
     }
@@ -3647,7 +3688,7 @@ BN.prototype.toString = function toString(base) {
       out = '-' + out;
     return out;
   } else {
-    assert(false, 'Only 16 and 10 base are supported');
+    assert(false, 'Base should be between 2 and 36');
   }
 };
 
@@ -3943,15 +3984,15 @@ BN.prototype.mulTo = function mulTo(num, out) {
     var maxJ = Math.min(k, num.length - 1);
     for (var j = Math.max(0, k - this.length + 1); j <= maxJ; j++) {
       var i = k - j;
-      var a = this.words[i];
-      var b = num.words[j];
+      var a = this.words[i] | 0;
+      var b = num.words[j] | 0;
       var r = a * b;
 
       var lo = r & 0x3ffffff;
-      ncarry += (r / 0x4000000) | 0;
-      lo += rword;
+      ncarry = (ncarry + ((r / 0x4000000) | 0)) | 0;
+      lo = (lo + rword) | 0;
       rword = lo & 0x3ffffff;
-      ncarry += lo >>> 26;
+      ncarry = (ncarry + (lo >>> 26)) | 0;
     }
     out.words[k] = rword;
     carry = ncarry;
@@ -4134,6 +4175,24 @@ BN.prototype.shrn = function shrn(bits) {
   return this.clone().ishrn(bits);
 };
 
+// Test if n bit is set
+BN.prototype.testn = function testn(bit) {
+  assert(typeof bit === 'number' && bit >= 0);
+  var r = bit % 26;
+  var s = (bit - r) / 26;
+  var q = 1 << r;
+
+  // Fast case: bit is much higher than all existing words
+  if (this.length <= s) {
+    return false;
+  }
+
+  // Check bit and return
+  var w = this.words[s];
+
+  return !!(w & q);
+};
+
 // Return only lowers bits of number (in-place)
 BN.prototype.imaskn = function imaskn(bits) {
   assert(typeof bits === 'number' && bits >= 0);
@@ -4202,6 +4261,16 @@ BN.prototype.addn = function addn(num) {
 
 BN.prototype.subn = function subn(num) {
   return this.clone().isubn(num);
+};
+
+BN.prototype.iabs = function iabs() {
+  this.sign = false;
+
+  return this
+};
+
+BN.prototype.abs = function abs() {
+  return this.clone().iabs();
 };
 
 BN.prototype._wordDiv = function _wordDiv(num, mode) {
@@ -4418,6 +4487,44 @@ BN.prototype._egcd = function _egcd(x1, p) {
     return x1;
   else
     return x2;
+};
+
+BN.prototype.gcd = function gcd(num) {
+  if (this.cmpn(0) === 0)
+    return num.clone();
+  if (num.cmpn(0) === 0)
+    return this.clone();
+
+  var a = this.clone();
+  var b = num.clone();
+  a.sign = false;
+  b.sign = false;
+
+  // Remove common factor of two
+  for (var shift = 0; a.isEven() && b.isEven(); shift++) {
+    a.ishrn(1);
+    b.ishrn(1);
+  }
+
+  while (a.isEven())
+    a.ishrn(1);
+
+  do {
+    while (b.isEven())
+      b.ishrn(1);
+
+    // Swap `a` and `b` to make `a` always bigger than `b`
+    if (a.cmp(b) < 0) {
+      var t = a;
+      a = b;
+      b = t;
+    }
+    a.isub(a.div(b).mul(b));
+  } while (a.cmpn(0) !== 0 && b.cmpn(0) !== 0);
+  if (a.cmpn(0) === 0)
+    return b.ishln(shift);
+  else
+    return a.ishln(shift);
 };
 
 // Invert number in the field F(num)
@@ -6754,7 +6861,7 @@ if (typeof Object.create === 'function') {
 },{}],26:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.15.10",
+  "version": "0.15.11",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
@@ -6782,7 +6889,7 @@ module.exports={
     "uglify-js": "^2.4.13"
   },
   "dependencies": {
-    "bn.js": "^0.11.6",
+    "bn.js": "^0.14.1",
     "hash.js": "^0.2.0",
     "inherits": "^2.0.1"
   }
