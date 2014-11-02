@@ -20,6 +20,7 @@ describe('ECDSA', function() {
       // Get keys out of pair
       assert(keys.getPublic().x && keys.getPublic().y);
       assert(keys.getPrivate().length > 0);
+      assert.equal(keys.getPrivate('hex').length, 64);
       assert(keys.getPublic('hex').length > 0);
       assert(keys.getPrivate('hex').length > 0);
       assert(keys.validate().result);
