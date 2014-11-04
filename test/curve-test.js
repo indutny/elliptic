@@ -97,4 +97,13 @@ describe('Curve', function() {
     assert(p2.validate());
     assert(p1.eq(p2));
   });
+
+  it('should store precomputed values correctly on negation', function() {
+    var curve = elliptic.curves.secp256k1.curve;
+    var p = curve.g.mul('2');
+    p.precompute();
+    var neg = p.neg(true);
+    var neg2 = neg.neg(true);
+    assert(p.eq(neg2));
+  });
 });
