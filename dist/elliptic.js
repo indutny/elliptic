@@ -3,7 +3,7 @@ var elliptic = exports;
 
 elliptic.version = _dereq_('../package.json').version;
 elliptic.utils = _dereq_('./elliptic/utils');
-elliptic.rand = _dereq_('./elliptic/rand');
+elliptic.rand = _dereq_('brorand');
 elliptic.hmacDRBG = _dereq_('./elliptic/hmac-drbg');
 elliptic.curve = _dereq_('./elliptic/curve');
 elliptic.curves = _dereq_('./elliptic/curves');
@@ -11,7 +11,7 @@ elliptic.curves = _dereq_('./elliptic/curves');
 // Protocols
 elliptic.ec = _dereq_('./elliptic/ec');
 
-},{"../package.json":26,"./elliptic/curve":4,"./elliptic/curves":7,"./elliptic/ec":8,"./elliptic/hmac-drbg":11,"./elliptic/rand":12,"./elliptic/utils":13}],2:[function(_dereq_,module,exports){
+},{"../package.json":26,"./elliptic/curve":4,"./elliptic/curves":7,"./elliptic/ec":8,"./elliptic/hmac-drbg":11,"./elliptic/utils":12,"brorand":14}],2:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var bn = _dereq_('bn.js');
 var elliptic = _dereq_('../../elliptic');
@@ -315,7 +315,7 @@ BasePoint.prototype.dblp = function dblp(k) {
   return r;
 };
 
-},{"../../elliptic":1,"assert":15,"bn.js":14}],3:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"assert":15,"bn.js":13}],3:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var curve = _dereq_('../curve');
 var elliptic = _dereq_('../../elliptic');
@@ -444,9 +444,9 @@ Point.fromJSON = function fromJSON(curve, obj) {
 Point.prototype.inspect = function inspect() {
   if (this.isInfinity())
     return '<EC Point Infinity>';
-  return '<EC Point x: ' + this.x.fromRed().toString(16) +
-      ' y: ' + this.y.fromRed().toString(16) +
-      ' z: ' + this.z.fromRed().toString(16) + '>';
+  return '<EC Point x: ' + this.x.fromRed().toString(16, 2) +
+      ' y: ' + this.y.fromRed().toString(16, 2) +
+      ' z: ' + this.z.fromRed().toString(16, 2) + '>';
 };
 
 Point.prototype.isInfinity = function isInfinity() {
@@ -678,7 +678,7 @@ Point.prototype.getY = function getY() {
 Point.prototype.toP = Point.prototype.normalize;
 Point.prototype.mixedAdd = Point.prototype.add;
 
-},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":25}],4:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":13,"inherits":25}],4:[function(_dereq_,module,exports){
 var curve = exports;
 
 curve.base = _dereq_('./base');
@@ -752,8 +752,8 @@ Point.fromJSON = function fromJSON(curve, obj) {
 Point.prototype.inspect = function inspect() {
   if (this.isInfinity())
     return '<EC Point Infinity>';
-  return '<EC Point x: ' + this.x.fromRed().toString(16) +
-      ' z: ' + this.z.fromRed().toString(16) + '>';
+  return '<EC Point x: ' + this.x.fromRed().toString(16, 2) +
+      ' z: ' + this.z.fromRed().toString(16, 2) + '>';
 };
 
 Point.prototype.isInfinity = function isInfinity() {
@@ -851,7 +851,7 @@ Point.prototype.getX = function getX() {
   return this.x.fromRed();
 };
 
-},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":25}],6:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":13,"inherits":25}],6:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var curve = _dereq_('../curve');
 var elliptic = _dereq_('../../elliptic');
@@ -1208,8 +1208,8 @@ Point.fromJSON = function fromJSON(curve, obj, red) {
 Point.prototype.inspect = function inspect() {
   if (this.isInfinity())
     return '<EC Point Infinity>';
-  return '<EC Point x: ' + this.x.fromRed().toString(16) +
-      ' y: ' + this.y.fromRed().toString(16) + '>';
+  return '<EC Point x: ' + this.x.fromRed().toString(16 ,2) +
+      ' y: ' + this.y.fromRed().toString(16, 2) + '>';
 };
 
 Point.prototype.isInfinity = function isInfinity() {
@@ -1316,7 +1316,7 @@ Point.prototype.neg = function neg(_precompute) {
       },
       doubles: pre.doubles && {
         step: pre.doubles.step,
-        step: pre.doubles.points.map(negate)
+        points: pre.doubles.points.map(negate)
       }
     };
   }
@@ -1739,9 +1739,9 @@ JPoint.prototype.eq = function eq(p) {
 JPoint.prototype.inspect = function inspect() {
   if (this.isInfinity())
     return '<EC JPoint Infinity>';
-  return '<EC JPoint x: ' + this.x.toString(16) +
-      ' y: ' + this.y.toString(16) +
-      ' z: ' + this.z.toString(16) + '>';
+  return '<EC JPoint x: ' + this.x.toString(16, 2) +
+      ' y: ' + this.y.toString(16, 2) +
+      ' z: ' + this.z.toString(16, 2) + '>';
 };
 
 JPoint.prototype.isInfinity = function isInfinity() {
@@ -1749,7 +1749,7 @@ JPoint.prototype.isInfinity = function isInfinity() {
   return this.z.cmpn(0) === 0;
 };
 
-},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":14,"inherits":25}],7:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"../curve":4,"assert":15,"bn.js":13,"inherits":25}],7:[function(_dereq_,module,exports){
 var curves = exports;
 
 var assert = _dereq_('assert');
@@ -2678,7 +2678,7 @@ defineCurve('secp256k1', {
   ]
 });
 
-},{"../elliptic":1,"assert":15,"bn.js":14,"hash.js":19}],8:[function(_dereq_,module,exports){
+},{"../elliptic":1,"assert":15,"bn.js":13,"hash.js":19}],8:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var bn = _dereq_('bn.js');
 var elliptic = _dereq_('../../elliptic');
@@ -2692,8 +2692,11 @@ function EC(options) {
     return new EC(options);
 
   // Shortcut `elliptic.ec(curve-name)`
-  if (typeof options === 'string')
+  if (typeof options === 'string') {
+    assert(elliptic.curves.hasOwnProperty(options), 'Unknown curve ' + options);
+
     options = elliptic.curves[options];
+  }
 
   // Shortcut for `elliptic.ec(elliptic.curves.curveName)`
   if (options instanceof elliptic.curves.PresetCurve)
@@ -2828,7 +2831,7 @@ EC.prototype.verify = function verify(msg, signature, key) {
   return p.getX().mod(this.n).cmp(r) === 0;
 };
 
-},{"../../elliptic":1,"./key":9,"./signature":10,"assert":15,"bn.js":14}],9:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"./key":9,"./signature":10,"assert":15,"bn.js":13}],9:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var bn = _dereq_('bn.js');
 
@@ -2921,7 +2924,7 @@ KeyPair.prototype.getPublic = function getPublic(compact, enc) {
 
 KeyPair.prototype.getPrivate = function getPrivate(enc) {
   if (enc === 'hex')
-    return this.priv.toString(16);
+    return this.priv.toString(16, 2);
   else
     return this.priv;
 };
@@ -2970,11 +2973,11 @@ KeyPair.prototype.verify = function verify(msg, signature) {
 };
 
 KeyPair.prototype.inspect = function inspect() {
-  return '<Key priv: ' + (this.priv && this.priv.toString(16)) +
+  return '<Key priv: ' + (this.priv && this.priv.toString(16, 2)) +
          ' pub: ' + (this.pub && this.pub.inspect()) + ' >';
 };
 
-},{"../../elliptic":1,"assert":15,"bn.js":14}],10:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"assert":15,"bn.js":13}],10:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var bn = _dereq_('bn.js');
 
@@ -3039,7 +3042,7 @@ Signature.prototype.toDER = function toDER(enc) {
   return utils.encode(res, enc);
 };
 
-},{"../../elliptic":1,"assert":15,"bn.js":14}],11:[function(_dereq_,module,exports){
+},{"../../elliptic":1,"assert":15,"bn.js":13}],11:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 
 var hash = _dereq_('hash.js');
@@ -3155,57 +3158,6 @@ HmacDRBG.prototype.generate = function generate(len, enc, add, addEnc) {
 };
 
 },{"../elliptic":1,"assert":15,"hash.js":19}],12:[function(_dereq_,module,exports){
-var assert = _dereq_('assert');
-var elliptic = _dereq_('../elliptic');
-
-var r;
-
-module.exports = function rand(len) {
-  if (!r)
-    r = new Rand();
-
-  return r.generate(len);
-};
-
-function Rand() {
-}
-
-Rand.prototype.generate = function generate(len) {
-  return this._rand(len);
-};
-
-if (typeof window === 'object') {
-  if (window.crypto && window.crypto.getRandomValues) {
-    // Modern browsers
-    Rand.prototype._rand = function _rand(n) {
-      var arr = new Uint8Array(n);
-      window.crypto.getRandomValues(arr);
-      return arr;
-    };
-  } else if (window.msCrypto && window.msCrypto.getRandomValues) {
-    // IE
-    Rand.prototype._rand = function _rand(n) {
-      var arr = new Uint8Array(n);
-      window.msCrypto.getRandomValues(arr);
-      return arr;
-    };
-  } else {
-    // Old junk
-    Rand.prototype._rand = function() {
-      throw new Error('Not implemented yet');
-    };
-  }
-} else {
-  // Node.js
-  var crypto;
-  Rand.prototype._rand = function _rand(n) {
-    if (!crypto)
-      crypto = _dereq_('cry' + 'pto');
-    return crypto.randomBytes(n);
-  };
-}
-
-},{"../elliptic":1,"assert":15}],13:[function(_dereq_,module,exports){
 var assert = _dereq_('assert');
 var bn = _dereq_('bn.js');
 
@@ -3353,7 +3305,7 @@ function getJSF(k1, k2) {
 }
 utils.getJSF = getJSF;
 
-},{"assert":15,"bn.js":14}],14:[function(_dereq_,module,exports){
+},{"assert":15,"bn.js":13}],13:[function(_dereq_,module,exports){
 // Utils
 
 function assert(val, msg) {
@@ -3378,7 +3330,7 @@ function inherits(ctor, superCtor) {
 
 // BN
 
-function BN(number, base) {
+function BN(number, base, endian) {
   // May be `new BN(bn)` ?
   if (number !== null &&
       typeof number === 'object' &&
@@ -3393,8 +3345,13 @@ function BN(number, base) {
   // Reduction context
   this.red = null;
 
+  if (base === 'le' || base === 'be') {
+    endian = base;
+    base = 10;
+  }
+
   if (number !== null)
-    this._init(number || 0, base || 10);
+    this._init(number || 0, base || 10, endian || 'be');
 }
 if (typeof module === 'object')
   module.exports = BN;
@@ -3402,7 +3359,7 @@ if (typeof module === 'object')
 BN.BN = BN;
 BN.wordSize = 26;
 
-BN.prototype._init = function init(number, base) {
+BN.prototype._init = function init(number, base, endian) {
   if (typeof number === 'number') {
     if (number < 0) {
       this.sign = true;
@@ -3420,27 +3377,7 @@ BN.prototype._init = function init(number, base) {
     }
     return;
   } else if (typeof number === 'object') {
-    // Perhaps a Uint8Array
-    assert(typeof number.length === 'number');
-    this.length = Math.ceil(number.length / 3);
-    this.words = new Array(this.length);
-    for (var i = 0; i < this.length; i++)
-      this.words[i] = 0;
-
-    // Assume big-endian
-    var off = 0;
-    for (var i = number.length - 1, j = 0; i >= 0; i -= 3) {
-      var w = number[i] | (number[i - 1] << 8) | (number[i - 2] << 16);
-      this.words[j] |= (w << off) & 0x3ffffff;
-      this.words[j + 1] = (w >>> (26 - off)) & 0x3ffffff;
-      off += 24;
-      if (off >= 26) {
-        off -= 26;
-        j++;
-      }
-    }
-
-    return this.strip();
+    return this._initArray(number, base, endian);
   }
   if (base === 'hex')
     base = 16;
@@ -3460,6 +3397,41 @@ BN.prototype._init = function init(number, base) {
     this.sign = true;
 
   this.strip();
+};
+
+BN.prototype._initArray = function _initArray(number, base, endian) {
+  // Perhaps a Uint8Array
+  assert(typeof number.length === 'number');
+  this.length = Math.ceil(number.length / 3);
+  this.words = new Array(this.length);
+  for (var i = 0; i < this.length; i++)
+    this.words[i] = 0;
+
+  var off = 0;
+  if (endian === 'be') {
+    for (var i = number.length - 1, j = 0; i >= 0; i -= 3) {
+      var w = number[i] | (number[i - 1] << 8) | (number[i - 2] << 16);
+      this.words[j] |= (w << off) & 0x3ffffff;
+      this.words[j + 1] = (w >>> (26 - off)) & 0x3ffffff;
+      off += 24;
+      if (off >= 26) {
+        off -= 26;
+        j++;
+      }
+    }
+  } else if (endian === 'le') {
+    for (var i = 0, j = 0; i < number.length; i += 3) {
+      var w = number[i] | (number[i + 1] << 8) | (number[i + 2] << 16);
+      this.words[j] |= (w << off) & 0x3ffffff;
+      this.words[j + 1] = (w >>> (26 - off)) & 0x3ffffff;
+      off += 24;
+      if (off >= 26) {
+        off -= 26;
+        j++;
+      }
+    }
+  }
+  return this.strip();
 };
 
 BN.prototype._parseHex = function parseHex(number, start) {
@@ -3640,11 +3612,12 @@ var groupBases = [
   24300000, 28629151, 33554432, 39135393, 45435424, 52521875, 60466176
 ];
 
-BN.prototype.toString = function toString(base) {
+BN.prototype.toString = function toString(base, padding) {
   base = base || 10;
   if (base === 16 || base === 'hex') {
     var out = '';
     var off = 0;
+    var padding = padding | 0 || 1;
     var carry = 0;
     for (var i = 0; i < this.length; i++) {
       var w = this.words[i];
@@ -3662,6 +3635,8 @@ BN.prototype.toString = function toString(base) {
     }
     if (carry !== 0)
       out = carry.toString(16) + out;
+    while (out.length % padding !== 0)
+      out = '0' + out;
     if (this.sign)
       out = '-' + out;
     return out;
@@ -3970,8 +3945,7 @@ function _genCombMulTo(alen, blen) {
 }
 */
 
-// Multiply `this` by `num` and store data in out
-BN.prototype.mulTo = function mulTo(num, out) {
+BN.prototype._smallMulTo = function _smallMulTo(num, out) {
   out.sign = num.sign !== this.sign;
   out.length = this.length + num.length;
 
@@ -4004,6 +3978,56 @@ BN.prototype.mulTo = function mulTo(num, out) {
   }
 
   return out.strip();
+};
+
+BN.prototype._bigMulTo = function _bigMulTo(num, out) {
+  out.sign = num.sign !== this.sign;
+  out.length = this.length + num.length;
+
+  var carry = 0;
+  var hncarry = 0;
+  for (var k = 0; k < out.length - 1; k++) {
+    // Sum all words with the same `i + j = k` and accumulate `ncarry`,
+    // note that ncarry could be >= 0x3ffffff
+    var ncarry = hncarry;
+    hncarry = 0;
+    var rword = carry & 0x3ffffff;
+    var maxJ = Math.min(k, num.length - 1);
+    for (var j = Math.max(0, k - this.length + 1); j <= maxJ; j++) {
+      var i = k - j;
+      var a = this.words[i] | 0;
+      var b = num.words[j] | 0;
+      var r = a * b;
+
+      var lo = r & 0x3ffffff;
+      ncarry = (ncarry + ((r / 0x4000000) | 0)) | 0;
+      lo = (lo + rword) | 0;
+      rword = lo & 0x3ffffff;
+      ncarry = (ncarry + (lo >>> 26)) | 0;
+
+      hncarry += ncarry >>> 26;
+      ncarry &= 0x3ffffff;
+    }
+    out.words[k] = rword;
+    carry = ncarry;
+    ncarry = hncarry;
+  }
+  if (carry !== 0) {
+    out.words[k] = carry;
+  } else {
+    out.length--;
+  }
+
+  return out.strip();
+};
+
+BN.prototype.mulTo = function mulTo(num, out) {
+  var res;
+  if (this.length + num.length < 63)
+    res = this._smallMulTo(num, out);
+  else
+    res = this._bigMulTo(num, out);
+  return res;
 };
 
 // Multiply `this` by `num`
@@ -4222,7 +4246,21 @@ BN.prototype.maskn = function maskn(bits) {
 BN.prototype.iaddn = function iaddn(num) {
   assert(typeof num === 'number');
   if (num < 0)
-    return this.isubn(num);
+    return this.isubn(-num);
+
+  // Possible sign change
+  if (this.sign) {
+    if (this.length === 1 && this.words[0] < num) {
+      this.words[0] = num - this.words[0];
+      this.sign = false;
+      return this;
+    }
+
+    this.sign = false;
+    this.isubn(num);
+    this.sign = true;
+    return this;
+  }
   this.words[0] += num;
 
   // Carry
@@ -4241,9 +4279,16 @@ BN.prototype.iaddn = function iaddn(num) {
 // Subtract plain number `num` from `this`
 BN.prototype.isubn = function isubn(num) {
   assert(typeof num === 'number');
-  assert(this.cmpn(num) >= 0, 'Sign change is not supported in isubn');
   if (num < 0)
     return this.iaddn(-num);
+
+  if (this.sign) {
+    this.sign = false;
+    this.iaddn(num);
+    this.sign = true;
+    return this;
+  }
+
   this.words[0] -= num;
 
   // Carry
@@ -4460,20 +4505,23 @@ BN.prototype._egcd = function _egcd(x1, p) {
     a = a.clone();
 
   var x2 = new BN(0);
+  while (b.isEven())
+    b.ishrn(1);
+  var delta = b.clone();
   while (a.cmpn(1) > 0 && b.cmpn(1) > 0) {
     while (a.isEven()) {
       a.ishrn(1);
       if (x1.isEven())
         x1.ishrn(1);
       else
-        x1.iadd(p).ishrn(1);
+        x1.iadd(delta).ishrn(1);
     }
     while (b.isEven()) {
       b.ishrn(1);
       if (x2.isEven())
         x2.ishrn(1);
       else
-        x2.iadd(p).ishrn(1);
+        x2.iadd(delta).ishrn(1);
     }
     if (a.cmp(b) >= 0) {
       a.isub(b);
@@ -5177,6 +5225,54 @@ Mont.prototype.invm = function invm(a) {
   var res = this.imod(a.invm(this.m).mul(this.r2));
   return res._forceRed(this);
 };
+
+},{}],14:[function(_dereq_,module,exports){
+var r;
+
+module.exports = function rand(len) {
+  if (!r)
+    r = new Rand();
+
+  return r.generate(len);
+};
+
+function Rand() {
+}
+
+Rand.prototype.generate = function generate(len) {
+  return this._rand(len);
+};
+
+if (typeof window === 'object') {
+  if (window.crypto && window.crypto.getRandomValues) {
+    // Modern browsers
+    Rand.prototype._rand = function _rand(n) {
+      var arr = new Uint8Array(n);
+      window.crypto.getRandomValues(arr);
+      return arr;
+    };
+  } else if (window.msCrypto && window.msCrypto.getRandomValues) {
+    // IE
+    Rand.prototype._rand = function _rand(n) {
+      var arr = new Uint8Array(n);
+      window.msCrypto.getRandomValues(arr);
+      return arr;
+    };
+  } else {
+    // Old junk
+    Rand.prototype._rand = function() {
+      throw new Error('Not implemented yet');
+    };
+  }
+} else {
+  // Node.js
+  var crypto;
+  Rand.prototype._rand = function _rand(n) {
+    if (!crypto)
+      crypto = _dereq_('cry' + 'pto');
+    return crypto.randomBytes(n);
+  };
+}
 
 },{}],15:[function(_dereq_,module,exports){
 // http://wiki.commonjs.org/wiki/Unit_Testing/1.0
@@ -6861,7 +6957,7 @@ if (typeof Object.create === 'function') {
 },{}],26:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "0.15.11",
+  "version": "0.15.15",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
@@ -6889,7 +6985,8 @@ module.exports={
     "uglify-js": "^2.4.13"
   },
   "dependencies": {
-    "bn.js": "^0.14.1",
+    "bn.js": "^0.15.0",
+    "brorand": "^1.0.1",
     "hash.js": "^0.2.0",
     "inherits": "^2.0.1"
   }
