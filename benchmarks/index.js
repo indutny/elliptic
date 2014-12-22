@@ -7,6 +7,7 @@ var eccjs = require('eccjs');
 var jodid = require('./deps/jodid');
 var ecdsa = require('ecdsa');
 var ECKey = require('eckey');
+var secp256k1 = require('secp256k1');
 
 var benchmarks = [];
 var maxTime = 10;
@@ -73,6 +74,12 @@ var k3 = new ECKey(crypto.randomBytes(32));
 var s3 = ecdsa.sign(m3, k3.privateKey);
 assert(ecdsa.verify(m3, s3, k3.publicKey));
 
+var m4 = crypto.createHash('sha256').update(str).digest();
+var k4priv = crypto.randomBytes(32);
+var k4pub = secp256k1.createPublicKey(k4priv);
+var s4 = secp256k1.sign(k4priv, m4);
+assert(secp256k1.verify(k4pub, m4, s4) > 0);
+
 add('sign', {
   elliptic: function() {
     c1.sign(m1, k1);
@@ -85,6 +92,9 @@ add('sign', {
   },
   ecdsa: function() {
     ecdsa.sign(m3, k3.privateKey);
+  },
+  secp256k1: function() {
+    secp256k1.sign(k4priv, m4);
   },
 });
 
@@ -105,6 +115,9 @@ add('verify', {
   },
   ecdsa: function() {
     ecdsa.verify(m3, s3, k3.publicKey);
+  },
+  secp256k1: function() {
+    secp256k1.verify(k4pub, m4, s4);
   },
 });
 
