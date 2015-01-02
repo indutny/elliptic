@@ -30,7 +30,7 @@
   "dependencies": {
     "bn.js": "^0.16.0",
     "brorand": "^1.0.1",
-    "hash.js": "^0.2.0",
+    "hash.js": "^0.3.2",
     "inherits": "^2.0.1"
   }
 }
