@@ -110,6 +110,30 @@ describe('Curve', function() {
     assert(p1.eq(p2));
   });
 
+  it('should correctly double the affine point on secp256k1', function() {
+    var bad = {
+      x: '026a2073b1ef6fab47ace18e60e728a05180a82755bbcec9a0abc08ad9f7a3d4',
+      y: '9cd8cb48c3281596139f147c1364a3ede88d3f310fdb0eb98c924e599ca1b3c9',
+      z: 'd78587ad45e4102f48b54b5d85598296e069ce6085002e169c6bad78ddc6d9bd'
+    };
+
+    var good = {
+      x: 'e7789226739ac2eb3c7ccb2a9a910066beeed86cdb4e0f8a7fee8eeb29dc7016',
+      y: '4b76b191fd6d47d07828ea965e275b76d0e3e0196cd5056d38384fbb819f9fcb',
+      z: 'cbf8d99056618ba132d6145b904eee1ce566e0feedb9595139c45f84e90cfa7d'
+    };
+
+    var curve = elliptic.curves.secp256k1.curve;
+    bad = curve.jpoint(bad.x, bad.y, bad.z);
+    good = curve.jpoint(good.x, good.y, good.z);
+
+    // They are the same points
+    assert(bad.add(good.neg()).isInfinity());
+
+    // But doubling borks them out
+    assert(bad.dbl().add(good.dbl().neg()).isInfinity());
+  });
+
   it('should store precomputed values correctly on negation', function() {
     var curve = elliptic.curves.secp256k1.curve;
     var p = curve.g.mul('2');
