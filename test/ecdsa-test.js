@@ -34,15 +34,15 @@ describe('ECDSA', function() {
       assert(keys.verify(msg, signature), 'On-key verify');
 
       // Load private key from hex
-      var keys = ecdsa.keyPair(keys.getPrivate('hex'), 'hex');
+      var keys = ecdsa.keyFromPrivate(keys.getPrivate('hex'), 'hex');
       var signature = ecdsa.sign(msg, keys);
       assert(ecdsa.verify(msg, signature, keys), 'hex-private verify');
 
       // Load public key from compact hex
-      var keys = ecdsa.keyPair(keys.getPublic(true, 'hex'), 'hex');
+      var keys = ecdsa.keyFromPublic(keys.getPublic(true, 'hex'), 'hex');
 
       // Load public key from hex
-      var keys = ecdsa.keyPair(keys.getPublic('hex'), 'hex');
+      var keys = ecdsa.keyFromPublic(keys.getPublic('hex'), 'hex');
 
       // DER encoding
       var dsign = signature.toDER('hex');
@@ -55,8 +55,8 @@ describe('ECDSA', function() {
       assert(!ecdsa.verify(msg, signature, keys), 'Wrong key verify');
 
       // Invalid private key
-      var keys = ecdsa.keyPair(keys.getPrivate('hex') + keys.getPrivate('hex'),
-                               'hex');
+      var keys = ecdsa.keyFromPrivate(keys.getPrivate('hex') +
+                                      keys.getPrivate('hex'));
       assert(!ecdsa.verify(msg, signature, keys), 'Wrong key verify');
     });
   }
@@ -77,7 +77,7 @@ describe('ECDSA', function() {
           var sign = ecdsa.sign(dgst, opt.key);
           assert.equal(sign.r.toString(16), c.r);
           assert.equal(sign.s.toString(16), c.s);
-          assert.ok(ecdsa.keyPair(opt.pub).validate().result,
+          assert.ok(ecdsa.keyFromPublic(opt.pub).validate().result,
                     'Invalid public key');
           assert.ok(ecdsa.verify(dgst, sign, opt.pub),
                     'Invalid signature');
