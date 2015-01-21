@@ -1,6 +1,6 @@
 var assert = require('assert');
 var elliptic = require('../');
-var hash = require('hash.js');
+var hash = require('../lib/elliptic/hash');
 
 describe('ECDSA', function() {
   function test(name) {
@@ -71,7 +71,7 @@ describe('ECDSA', function() {
           hash: c.hash
         });
         var descr = 'should not fail on "' + opt.name + '" ' +
-                    'and hash ' + c.hash.name + ' on "' + c.message + '"';
+                    'and hash ' + c.hash.hashName + ' on "' + c.message + '"';
         it(descr, function() {
           var dgst = c.hash().update(c.message).digest();
           var sign = ecdsa.sign(dgst, opt.key);

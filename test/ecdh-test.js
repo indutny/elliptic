@@ -1,6 +1,6 @@
 var assert = require('assert');
 var elliptic = require('../');
-var hash = require('hash.js');
+var hash = require('../lib/elliptic/hash');
 
 describe('ECDH', function() {
   function test(name) {

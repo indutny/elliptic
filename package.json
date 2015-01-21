@@ -29,7 +29,8 @@
   },
   "dependencies": {
     "bn.js": "^1.0.0",
-    "hash.js": "^1.0.0",
+    "create-hash": "^1.1.0",
+    "create-hmac": "^1.1.0",
     "inherits": "^2.0.1",
     "randombytes": "^2.0.0"
   }
