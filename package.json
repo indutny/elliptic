@@ -29,8 +29,8 @@
   },
   "dependencies": {
     "bn.js": "^1.0.0",
-    "brorand": "^1.0.1",
     "hash.js": "^1.0.0",
-    "inherits": "^2.0.1"
+    "inherits": "^2.0.1",
+    "randombytes": "^2.0.0"
   }
 }
