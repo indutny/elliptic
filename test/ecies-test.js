@@ -13,15 +13,16 @@ describe('ECIES', function() {
       var msg = "deadbeef";
 
       //encrypt a message with his public key
-      var enc = ec1.encrypt(msg, bob.getPublic());
+      var enc = ecies.encrypt(msg, bob.getPublic());
 
       //decrypt a message with his private key
-      var dec = ec1.decrypt(enc, bob.getPrivate());
+      var dec = ecies.decrypt(enc, bob.getPrivate());
 
 
-      asset.equal(msg, dec);
+      assert.equal(msg, dec);
 
     });
   }
 
   test('ed25519');
+});
