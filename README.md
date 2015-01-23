@@ -81,6 +81,28 @@ console.log(shared2.toString(16));
 
 NOTE: `.derive()` returns a [BN][1] instance.
 
+### ECIES
+```javascript
+var ecies = new EC('ed25519');
+
+// Generate key pair for bob
+var bob = ecies.genKeyPair();
+var msg = "deadbeef";
+console.log("Encrypting message: " + msg);
+
+//encrypt a message with his public key
+var enc = ecies.encrypt(msg, bob.getPublic());
+
+console.log("Encrypted Text: " + enc);
+
+//decrypt a message with his private key
+var dec = ecies.decrypt(enc, bob.getPrivate());
+
+console.log("Decrypted Text: " + dec);
+
+```
+NOTE: Should use curve ed25519 for ECIES
+
 ## Supported curves
 
 Elliptic.js support following curve types:
