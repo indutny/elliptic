@@ -91,12 +91,12 @@ var msg = "deadbeef";
 console.log("Encrypting message: " + msg);
 
 //encrypt a message with his public key
-var enc = ec1.encrypt(msg, bob.getPublic());
+var enc = ecies.encrypt(msg, bob.getPublic());
 
 console.log("Encrypted Text: " + enc);
 
 //decrypt a message with his private key
-var dec = ec1.decrypt(enc, bob.getPrivate());
+var dec = ecies.decrypt(enc, bob.getPrivate());
 
 console.log("Decrypted Text: " + dec);
 
