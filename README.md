@@ -110,6 +110,12 @@ or extended), various windowing techniques are used for different cases.
 All operations are performed in reduction context using [bn.js][1], hashing is
 provided by [hash.js][2]
 
+### Related projects
+
+* [eccrypto][3]: isomorphic implementation of ECDSA, ECDH and ECIES for both
+  browserify and node (uses `elliptic` for browser and [secp256k1-node][4] for
+  node)
+
 #### LICENSE
 
 This software is licensed under the MIT License.
@@ -138,3 +144,5 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 [0]: http://tools.ietf.org/html/rfc6979
 [1]: https://github.com/indutny/bn.js
 [2]: https://github.com/indutny/hash.js
+[3]: https://github.com/bitchan/eccrypto
+[4]: https://github.com/wanderer/secp256k1-node
