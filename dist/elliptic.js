@@ -3328,6 +3328,10 @@ function getJSF(k1, k2) {
 utils.getJSF = getJSF;
 
 },{"bn.js":13}],13:[function(_dereq_,module,exports){
+(function(module, exports) {
+
+'use strict';
+
 // Utils
 
 function assert(val, msg) {
@@ -3335,19 +3339,14 @@ function assert(val, msg) {
     throw new Error(msg || 'Assertion failed');
 }
 
-function assertEqual(l, r, msg) {
-  if (l != r)
-    throw new Error(msg || ('Assertion failed: ' + l + ' != ' + r));
-}
-
 // Could use `inherits` module, but don't want to move from single file
 // architecture yet.
 function inherits(ctor, superCtor) {
-  ctor.super_ = superCtor
-  var TempCtor = function () {}
-  TempCtor.prototype = superCtor.prototype
-  ctor.prototype = new TempCtor()
-  ctor.prototype.constructor = ctor
+  ctor.super_ = superCtor;
+  var TempCtor = function () {};
+  TempCtor.prototype = superCtor.prototype;
+  ctor.prototype = new TempCtor();
+  ctor.prototype.constructor = ctor;
 }
 
 // BN
@@ -3377,6 +3376,8 @@ function BN(number, base, endian) {
 }
 if (typeof module === 'object')
   module.exports = BN;
+else
+  exports.BN = BN;
 
 BN.BN = BN;
 BN.wordSize = 26;
@@ -3456,7 +3457,30 @@ BN.prototype._initArray = function _initArray(number, base, endian) {
   return this.strip();
 };
 
-BN.prototype._parseHex = function parseHex(number, start) {
+function parseHex(str, start, end) {
+  var r = 0;
+  var len = Math.min(str.length, end);
+  for (var i = start; i < len; i++) {
+    var c = str.charCodeAt(i) - 48;
+
+    r <<= 4;
+
+    // 'a' - 'f'
+    if (c >= 49 && c <= 54)
+      r |= c - 49 + 0xa;
+
+    // 'A' - 'F'
+    else if (c >= 17 && c <= 22)
+      r |= c - 17 + 0xa;
+
+    // '0' - '9'
+    else
+      r |= c & 0xf;
+  }
+  return r;
+}
+
+BN.prototype._parseHex = function _parseHex(number, start) {
   // Create possibly bigger array to ensure that it fits the number
   this.length = Math.ceil((number.length - start) / 6);
   this.words = new Array(this.length);
@@ -3466,7 +3490,7 @@ BN.prototype._parseHex = function parseHex(number, start) {
   // Scan 24-bit chunks and add them to the number
   var off = 0;
   for (var i = number.length - 6, j = 0; i >= start; i -= 6) {
-    var w = parseInt(number.slice(i, i + 6), 16);
+    var w = parseHex(number, i, i + 6);
     this.words[j] |= (w << off) & 0x3ffffff;
     this.words[j + 1] |= w >>> (26 - off) & 0x3fffff;
     off += 24;
@@ -3476,50 +3500,73 @@ BN.prototype._parseHex = function parseHex(number, start) {
     }
   }
   if (i + 6 !== start) {
-    var w = parseInt(number.slice(start, i + 6), 16);
+    var w = parseHex(number, start, i + 6);
     this.words[j] |= (w << off) & 0x3ffffff;
     this.words[j + 1] |= w >>> (26 - off) & 0x3fffff;
   }
   this.strip();
 };
 
-BN.prototype._parseBase = function parseBase(number, base, start) {
+function parseBase(str, start, end, mul) {
+  var r = 0;
+  var len = Math.min(str.length, end);
+  for (var i = start; i < len; i++) {
+    var c = str.charCodeAt(i) - 48;
+
+    r *= mul;
+
+    // 'a'
+    if (c >= 49)
+      r += c - 49 + 0xa;
+
+    // 'A'
+    else if (c >= 17)
+      r += c - 17 + 0xa;
+
+    // '0' - '9'
+    else
+      r += c;
+  }
+  return r;
+}
+
+BN.prototype._parseBase = function _parseBase(number, base, start) {
   // Initialize as zero
   this.words = [ 0 ];
   this.length = 1;
 
-  var word = 0;
-  var q = 1;
-  var p = 0;
-  var bigQ = null;
-  for (var i = start; i < number.length; i++) {
-    var digit;
-    var ch = number[i];
-    if (base === 10 || ch <= '9')
-      digit = ch | 0;
-    else if (ch >= 'a')
-      digit = ch.charCodeAt(0) - 97 + 10;
-    else
-      digit = ch.charCodeAt(0) - 65 + 10;
-    word *= base;
-    word += digit;
-    q *= base;
-    p++;
+  // Find length of limb in base
+  for (var limbLen = 0, limbPow = 1; limbPow <= 0x3ffffff; limbPow *= base)
+    limbLen++;
+  limbLen--;
+  limbPow = (limbPow / base) | 0;
 
-    if (q > 0xfffff) {
-      assert(q <= 0x3ffffff);
-      if (!bigQ)
-        bigQ = new BN(q);
-      this.mul(bigQ).copy(this);
-      this.iadd(new BN(word));
-      word = 0;
-      q = 1;
-      p = 0;
-    }
+  var total = number.length - start;
+  var mod = total % limbLen;
+  var end = Math.min(total, total - mod) + start;
+
+  var word = 0;
+  for (var i = start; i < end; i += limbLen) {
+    word = parseBase(number, i, i + limbLen, base);
+
+    this.imuln(limbPow);
+    if (this.words[0] + word < 0x4000000)
+      this.words[0] += word;
+    else
+      this._iaddn(word);
   }
-  if (p !== 0) {
-    this.mul(new BN(q)).copy(this);
-    this.iadd(new BN(word));
+
+  if (mod !== 0) {
+    var pow = 1;
+    var word = parseBase(number, i, number.length, base);
+
+    for (var i = 0; i < mod; i++)
+      pow *= base;
+    this.imuln(pow);
+    if (this.words[0] + word < 0x4000000)
+      this.words[0] += word;
+    else
+      this._iaddn(word);
   }
 };
 
@@ -3576,7 +3623,6 @@ var base = 2 - 1;
 while (++base < 36 + 1) {
   var groupSize = 0;
   var groupBase = 1;
-  // TODO: <=
   while (groupBase < (1 << BN.wordSize) / base) {
     groupBase *= base;
     groupSize += 1;
@@ -3765,8 +3811,6 @@ BN.prototype.bitLength = function bitLength() {
 };
 
 BN.prototype.byteLength = function byteLength() {
-  var hi = 0;
-  var w = this.words[this.length - 1];
   return Math.ceil(this.bitLength() / 8);
 };
 
@@ -3882,34 +3926,26 @@ BN.prototype.isub = function isub(num) {
   }
 
   // a > b
+  var a;
+  var b;
   if (cmp > 0) {
-    var a = this;
-    var b = num;
+    a = this;
+    b = num;
   } else {
-    var a = num;
-    var b = this;
+    a = num;
+    b = this;
   }
 
   var carry = 0;
   for (var i = 0; i < b.length; i++) {
-    var r = a.words[i] - b.words[i] - carry;
-    if (r < 0) {
-      r += 0x4000000;
-      carry = 1;
-    } else {
-      carry = 0;
-    }
-    this.words[i] = r;
+    var r = a.words[i] - b.words[i] + carry;
+    carry = r >> 26;
+    this.words[i] = r & 0x3ffffff;
   }
   for (; carry !== 0 && i < a.length; i++) {
-    var r = a.words[i] - carry;
-    if (r < 0) {
-      r += 0x4000000;
-      carry = 1;
-    } else {
-      carry = 0;
-    }
-    this.words[i] = r;
+    var r = a.words[i] + carry;
+    carry = r >> 26;
+    this.words[i] = r & 0x3ffffff;
   }
 
   // Copy rest of the words
@@ -4074,7 +4110,6 @@ BN.prototype.imul = function imul(num) {
   this.length = this.length + num.length;
   this.words[this.length - 1] = 0;
 
-  var lastCarry = 0;
   for (var k = this.length - 2; k >= 0; k--) {
     // Sum all words with the same `i + j = k` and accumulate `carry`,
     // note that carry could be >= 0x3ffffff
@@ -4109,6 +4144,29 @@ BN.prototype.imul = function imul(num) {
   return this.strip();
 };
 
+BN.prototype.imuln = function imuln(num) {
+  assert(typeof num === 'number');
+
+  // Carry
+  var carry = 0;
+  for (var i = 0; i < this.length; i++) {
+    var w = this.words[i] * num;
+    var lo = (w & 0x3ffffff) + (carry & 0x3ffffff);
+    carry >>= 26;
+    carry += (w / 0x4000000) | 0;
+    // NOTE: lo is 27bit maximum
+    carry += lo >>> 26;
+    this.words[i] = lo & 0x3ffffff;
+  }
+
+  if (carry !== 0) {
+    this.words[i] = carry;
+    this.length++;
+  }
+
+  return this;
+};
+
 // `this` * `this`
 BN.prototype.sqr = function sqr() {
   return this.mul(this);
@@ -4126,7 +4184,6 @@ BN.prototype.ishln = function ishln(bits) {
   var s = (bits - r) / 26;
   var carryMask = (0x3ffffff >>> (26 - r)) << (26 - r);
 
-  var o = this.clone();
   if (r !== 0) {
     var carry = 0;
     for (var i = 0; i < this.length; i++) {
@@ -4283,6 +4340,12 @@ BN.prototype.iaddn = function iaddn(num) {
     this.sign = true;
     return this;
   }
+
+  // Add without checks
+  return this._iaddn(num);
+};
+
+BN.prototype._iaddn = function _iaddn(num) {
   this.words[0] += num;
 
   // Carry
@@ -4333,11 +4396,59 @@ BN.prototype.subn = function subn(num) {
 BN.prototype.iabs = function iabs() {
   this.sign = false;
 
-  return this
+  return this;
 };
 
 BN.prototype.abs = function abs() {
   return this.clone().iabs();
+};
+
+BN.prototype._ishlnsubmul = function _ishlnsubmul(num, mul, shift) {
+  // Bigger storage is needed
+  var len = num.length + shift;
+  var i;
+  if (this.words.length < len) {
+    var t = new Array(len);
+    for (var i = 0; i < this.length; i++)
+      t[i] = this.words[i];
+    this.words = t;
+  } else {
+    i = this.length;
+  }
+
+  // Zeroify rest
+  this.length = Math.max(this.length, len);
+  for (; i < this.length; i++)
+    this.words[i] = 0;
+
+  var carry = 0;
+  for (var i = 0; i < num.length; i++) {
+    var w = this.words[i + shift] + carry;
+    var right = num.words[i] * mul;
+    w -= right & 0x3ffffff;
+    carry = (w >> 26) - ((right / 0x4000000) | 0);
+    this.words[i + shift] = w & 0x3ffffff;
+  }
+  for (; i < this.length - shift; i++) {
+    var w = this.words[i + shift] + carry;
+    carry = w >> 26;
+    this.words[i + shift] = w & 0x3ffffff;
+  }
+
+  if (carry === 0)
+    return this.strip();
+
+  // Subtraction overflow
+  assert(carry === -1);
+  carry = 0;
+  for (var i = 0; i < this.length; i++) {
+    var w = -this.words[i] + carry;
+    carry = w >> 26;
+    this.words[i] = w & 0x3ffffff;
+  }
+  this.sign = true;
+
+  return this.strip();
 };
 
 BN.prototype._wordDiv = function _wordDiv(num, mode) {
@@ -4346,64 +4457,59 @@ BN.prototype._wordDiv = function _wordDiv(num, mode) {
   var a = this.clone();
   var b = num;
 
-  var q = mode !== 'mod' && new BN(0);
-  var sign = false;
-
-  // Approximate quotient at each step
-  while (a.length > b.length) {
-    // NOTE: a.length is always >= 2, because of the condition .div()
-    var hi = a.words[a.length - 1] * 0x4000000 + a.words[a.length - 2];
-    var sq = (hi / b.words[b.length - 1]);
-    var sqhi = (sq / 0x4000000) | 0;
-    var sqlo = sq & 0x3ffffff;
-    sq = new BN(null);
-    sq.words = [ sqlo, sqhi ];
-    sq.length = 2;
-
-    // Collect quotient
-    var shift = (a.length - b.length - 1) * 26;
-    if (q) {
-      var t = sq.shln(shift);
-      if (a.sign)
-        q.isub(t);
-      else
-        q.iadd(t);
-    }
-
-    sq = sq.mul(b).ishln(shift);
-    if (a.sign)
-      a.iadd(sq)
-    else
-      a.isub(sq);
-  }
-  // At this point a.length <= b.length
-  while (a.ucmp(b) >= 0) {
-    // NOTE: a.length is always >= 2, because of the condition above
-    var hi = a.words[a.length - 1];
-    var sq = new BN((hi / b.words[b.length - 1]) | 0);
-    var shift = (a.length - b.length) * 26;
-
-    if (q) {
-      var t = sq.shln(shift);
-      if (a.sign)
-        q.isub(t);
-      else
-        q.iadd(t);
-    }
-
-    sq = sq.mul(b).ishln(shift);
-
-    if (a.sign)
-      a.iadd(sq);
-    else
-      a.isub(sq);
+  // Normalize
+  var bhi = b.words[b.length - 1];
+  for (var shift = 0; bhi < 0x2000000; shift++)
+    bhi <<= 1;
+  if (shift !== 0) {
+    b = b.shln(shift);
+    a.ishln(shift);
+    bhi = b.words[b.length - 1];
   }
 
-  if (a.sign) {
+  // Initialize quotient
+  var m = a.length - b.length;
+  var q;
+
+  if (mode !== 'mod') {
+    q = new BN(null);
+    q.length = m + 1;
+    q.words = new Array(q.length);
+    for (var i = 0; i < q.length; i++)
+      q.words[i] = 0;
+  }
+
+  var diff = a.clone()._ishlnsubmul(b, 1, m);
+  if (!diff.sign) {
+    a = diff;
     if (q)
-      q.isubn(1);
-    a.iadd(b);
+      q.words[m] = 1;
   }
+
+  for (var j = m - 1; j >= 0; j--) {
+    var qj = a.words[b.length + j] * 0x4000000 + a.words[b.length + j - 1];
+
+    // NOTE: (qj / bhi) is (0x3ffffff * 0x4000000 + 0x3ffffff) / 0x2000000 max
+    // (0x7ffffff)
+    qj = Math.min((qj / bhi) | 0, 0x3ffffff);
+
+    a._ishlnsubmul(b, qj, j);
+    while (a.sign) {
+      qj--;
+      a.sign = false;
+      a._ishlnsubmul(b, 1, j);
+      a.sign = !a.sign;
+    }
+    if (q)
+      q.words[j] = qj;
+  }
+  if (q)
+    q.strip();
+  a.strip();
+
+  // Denormalize
+  if (mode !== 'div' && shift !== 0)
+    a.ishrn(shift);
   return { div: q ? q : null, mod: a };
 };
 
@@ -4602,11 +4708,11 @@ BN.prototype.invm = function invm(num) {
   return this._egcd(new BN(1), num).mod(num);
 };
 
-BN.prototype.isEven = function isEven(num) {
+BN.prototype.isEven = function isEven() {
   return (this.words[0] & 1) === 0;
 };
 
-BN.prototype.isOdd = function isOdd(num) {
+BN.prototype.isOdd = function isOdd() {
   return (this.words[0] & 1) === 1;
 };
 
@@ -4886,30 +4992,27 @@ K256.prototype.imulK = function imulK(num) {
   num.words[num.length + 1] = 0;
   num.length += 2;
 
-  var uhi = 0;
-  var hi = 0;
+  // bounded at: 0x40 * 0x3ffffff + 0x3d0 = 0x100000390
+  var hi;
   var lo = 0;
   for (var i = 0; i < num.length; i++) {
     var w = num.words[i];
-    hi += w * 0x40;
+    hi = w * 0x40;
     lo += w * 0x3d1;
     hi += (lo / 0x4000000) | 0;
-    uhi += (hi / 0x4000000) | 0;
-    hi &= 0x3ffffff;
     lo &= 0x3ffffff;
 
     num.words[i] = lo;
 
     lo = hi;
-    hi = uhi;
-    uhi = 0;
   }
 
   // Fast length reduction
-  if (num.words[num.length - 1] === 0)
+  if (num.words[num.length - 1] === 0) {
     num.length--;
-  if (num.words[num.length - 1] === 0)
-    num.length--;
+    if (num.words[num.length - 1] === 0)
+      num.length--;
+  }
   return num;
 };
 
@@ -4974,7 +5077,7 @@ BN._prime = function prime(name) {
   primes[name] = prime;
 
   return prime;
-}
+};
 
 //
 // Base reduction engine
@@ -5191,12 +5294,9 @@ function Mont(m) {
   this.r2 = this.imod(this.r.sqr());
   this.rinv = this.r.invm(this.m);
 
-  // TODO(indutny): simplify it
-  this.minv = this.rinv.mul(this.r)
-                       .sub(new BN(1))
-                       .div(this.m)
-                       .neg()
-                       .mod(this.r);
+  this.minv = this.rinv.mul(this.r).isubn(1).div(this.m);
+  this.minv.sign = true;
+  this.minv = this.minv.mod(this.r);
 }
 inherits(Mont, Red);
 
@@ -5250,6 +5350,8 @@ Mont.prototype.invm = function invm(a) {
   var res = this.imod(a.invm(this.m).mul(this.r2));
   return res._forceRed(this);
 };
+
+})(typeof module === 'undefined' || module, this);
 
 },{}],14:[function(_dereq_,module,exports){
 var r;
@@ -5626,7 +5728,17 @@ var rotl32 = utils.rotl32;
 var sum32 = utils.sum32;
 var sum32_4 = utils.sum32_4;
 var sum32_5 = utils.sum32_5;
-var Num64 = utils.Num64;
+var rotr64_hi = utils.rotr64_hi;
+var rotr64_lo = utils.rotr64_lo;
+var shr64_hi = utils.shr64_hi;
+var shr64_lo = utils.shr64_lo;
+var sum64 = utils.sum64;
+var sum64_hi = utils.sum64_hi;
+var sum64_lo = utils.sum64_lo;
+var sum64_4_hi = utils.sum64_4_hi;
+var sum64_4_lo = utils.sum64_4_lo;
+var sum64_5_hi = utils.sum64_5_hi;
+var sum64_5_lo = utils.sum64_5_lo;
 var BlockHash = hash.common.BlockHash;
 
 var sha256_K = [
@@ -5649,50 +5761,47 @@ var sha256_K = [
 ];
 
 var sha512_K = [
-  [ 0x428a2f98, 0xd728ae22], [ 0x71374491, 0x23ef65cd ],
-  [ 0xb5c0fbcf, 0xec4d3b2f], [ 0xe9b5dba5, 0x8189dbbc ],
-  [ 0x3956c25b, 0xf348b538], [ 0x59f111f1, 0xb605d019 ],
-  [ 0x923f82a4, 0xaf194f9b], [ 0xab1c5ed5, 0xda6d8118 ],
-  [ 0xd807aa98, 0xa3030242], [ 0x12835b01, 0x45706fbe ],
-  [ 0x243185be, 0x4ee4b28c], [ 0x550c7dc3, 0xd5ffb4e2 ],
-  [ 0x72be5d74, 0xf27b896f], [ 0x80deb1fe, 0x3b1696b1 ],
-  [ 0x9bdc06a7, 0x25c71235], [ 0xc19bf174, 0xcf692694 ],
-  [ 0xe49b69c1, 0x9ef14ad2], [ 0xefbe4786, 0x384f25e3 ],
-  [ 0x0fc19dc6, 0x8b8cd5b5], [ 0x240ca1cc, 0x77ac9c65 ],
-  [ 0x2de92c6f, 0x592b0275], [ 0x4a7484aa, 0x6ea6e483 ],
-  [ 0x5cb0a9dc, 0xbd41fbd4], [ 0x76f988da, 0x831153b5 ],
-  [ 0x983e5152, 0xee66dfab], [ 0xa831c66d, 0x2db43210 ],
-  [ 0xb00327c8, 0x98fb213f], [ 0xbf597fc7, 0xbeef0ee4 ],
-  [ 0xc6e00bf3, 0x3da88fc2], [ 0xd5a79147, 0x930aa725 ],
-  [ 0x06ca6351, 0xe003826f], [ 0x14292967, 0x0a0e6e70 ],
-  [ 0x27b70a85, 0x46d22ffc], [ 0x2e1b2138, 0x5c26c926 ],
-  [ 0x4d2c6dfc, 0x5ac42aed], [ 0x53380d13, 0x9d95b3df ],
-  [ 0x650a7354, 0x8baf63de], [ 0x766a0abb, 0x3c77b2a8 ],
-  [ 0x81c2c92e, 0x47edaee6], [ 0x92722c85, 0x1482353b ],
-  [ 0xa2bfe8a1, 0x4cf10364], [ 0xa81a664b, 0xbc423001 ],
-  [ 0xc24b8b70, 0xd0f89791], [ 0xc76c51a3, 0x0654be30 ],
-  [ 0xd192e819, 0xd6ef5218], [ 0xd6990624, 0x5565a910 ],
-  [ 0xf40e3585, 0x5771202a], [ 0x106aa070, 0x32bbd1b8 ],
-  [ 0x19a4c116, 0xb8d2d0c8], [ 0x1e376c08, 0x5141ab53 ],
-  [ 0x2748774c, 0xdf8eeb99], [ 0x34b0bcb5, 0xe19b48a8 ],
-  [ 0x391c0cb3, 0xc5c95a63], [ 0x4ed8aa4a, 0xe3418acb ],
-  [ 0x5b9cca4f, 0x7763e373], [ 0x682e6ff3, 0xd6b2b8a3 ],
-  [ 0x748f82ee, 0x5defb2fc], [ 0x78a5636f, 0x43172f60 ],
-  [ 0x84c87814, 0xa1f0ab72], [ 0x8cc70208, 0x1a6439ec ],
-  [ 0x90befffa, 0x23631e28], [ 0xa4506ceb, 0xde82bde9 ],
-  [ 0xbef9a3f7, 0xb2c67915], [ 0xc67178f2, 0xe372532b ],
-  [ 0xca273ece, 0xea26619c], [ 0xd186b8c7, 0x21c0c207 ],
-  [ 0xeada7dd6, 0xcde0eb1e], [ 0xf57d4f7f, 0xee6ed178 ],
-  [ 0x06f067aa, 0x72176fba], [ 0x0a637dc5, 0xa2c898a6 ],
-  [ 0x113f9804, 0xbef90dae], [ 0x1b710b35, 0x131c471b ],
-  [ 0x28db77f5, 0x23047d84], [ 0x32caab7b, 0x40c72493 ],
-  [ 0x3c9ebe0a, 0x15c9bebc], [ 0x431d67c4, 0x9c100d4c ],
-  [ 0x4cc5d4be, 0xcb3e42b6], [ 0x597f299c, 0xfc657e2a ],
-  [ 0x5fcb6fab, 0x3ad6faec], [ 0x6c44198c, 0x4a475817 ]
+  0x428a2f98, 0xd728ae22, 0x71374491, 0x23ef65cd,
+  0xb5c0fbcf, 0xec4d3b2f, 0xe9b5dba5, 0x8189dbbc,
+  0x3956c25b, 0xf348b538, 0x59f111f1, 0xb605d019,
+  0x923f82a4, 0xaf194f9b, 0xab1c5ed5, 0xda6d8118,
+  0xd807aa98, 0xa3030242, 0x12835b01, 0x45706fbe,
+  0x243185be, 0x4ee4b28c, 0x550c7dc3, 0xd5ffb4e2,
+  0x72be5d74, 0xf27b896f, 0x80deb1fe, 0x3b1696b1,
+  0x9bdc06a7, 0x25c71235, 0xc19bf174, 0xcf692694,
+  0xe49b69c1, 0x9ef14ad2, 0xefbe4786, 0x384f25e3,
+  0x0fc19dc6, 0x8b8cd5b5, 0x240ca1cc, 0x77ac9c65,
+  0x2de92c6f, 0x592b0275, 0x4a7484aa, 0x6ea6e483,
+  0x5cb0a9dc, 0xbd41fbd4, 0x76f988da, 0x831153b5,
+  0x983e5152, 0xee66dfab, 0xa831c66d, 0x2db43210,
+  0xb00327c8, 0x98fb213f, 0xbf597fc7, 0xbeef0ee4,
+  0xc6e00bf3, 0x3da88fc2, 0xd5a79147, 0x930aa725,
+  0x06ca6351, 0xe003826f, 0x14292967, 0x0a0e6e70,
+  0x27b70a85, 0x46d22ffc, 0x2e1b2138, 0x5c26c926,
+  0x4d2c6dfc, 0x5ac42aed, 0x53380d13, 0x9d95b3df,
+  0x650a7354, 0x8baf63de, 0x766a0abb, 0x3c77b2a8,
+  0x81c2c92e, 0x47edaee6, 0x92722c85, 0x1482353b,
+  0xa2bfe8a1, 0x4cf10364, 0xa81a664b, 0xbc423001,
+  0xc24b8b70, 0xd0f89791, 0xc76c51a3, 0x0654be30,
+  0xd192e819, 0xd6ef5218, 0xd6990624, 0x5565a910,
+  0xf40e3585, 0x5771202a, 0x106aa070, 0x32bbd1b8,
+  0x19a4c116, 0xb8d2d0c8, 0x1e376c08, 0x5141ab53,
+  0x2748774c, 0xdf8eeb99, 0x34b0bcb5, 0xe19b48a8,
+  0x391c0cb3, 0xc5c95a63, 0x4ed8aa4a, 0xe3418acb,
+  0x5b9cca4f, 0x7763e373, 0x682e6ff3, 0xd6b2b8a3,
+  0x748f82ee, 0x5defb2fc, 0x78a5636f, 0x43172f60,
+  0x84c87814, 0xa1f0ab72, 0x8cc70208, 0x1a6439ec,
+  0x90befffa, 0x23631e28, 0xa4506ceb, 0xde82bde9,
+  0xbef9a3f7, 0xb2c67915, 0xc67178f2, 0xe372532b,
+  0xca273ece, 0xea26619c, 0xd186b8c7, 0x21c0c207,
+  0xeada7dd6, 0xcde0eb1e, 0xf57d4f7f, 0xee6ed178,
+  0x06f067aa, 0x72176fba, 0x0a637dc5, 0xa2c898a6,
+  0x113f9804, 0xbef90dae, 0x1b710b35, 0x131c471b,
+  0x28db77f5, 0x23047d84, 0x32caab7b, 0x40c72493,
+  0x3c9ebe0a, 0x15c9bebc, 0x431d67c4, 0x9c100d4c,
+  0x4cc5d4be, 0xcb3e42b6, 0x597f299c, 0xfc657e2a,
+  0x5fcb6fab, 0x3ad6faec, 0x6c44198c, 0x4a475817
 ];
-sha512_K = sha512_K.map(function(pair) {
-  return new Num64(pair[0], pair[1]);
-});
 
 var sha1_K = [
   0x5A827999, 0x6ED9EBA1,
@@ -5794,16 +5903,16 @@ function SHA512() {
     return new SHA512();
 
   BlockHash.call(this);
-  this.h = [ new Num64(0x6a09e667, 0xf3bcc908),
-             new Num64(0xbb67ae85, 0x84caa73b),
-             new Num64(0x3c6ef372, 0xfe94f82b),
-             new Num64(0xa54ff53a, 0x5f1d36f1),
-             new Num64(0x510e527f, 0xade682d1),
-             new Num64(0x9b05688c, 0x2b3e6c1f),
-             new Num64(0x1f83d9ab, 0xfb41bd6b),
-             new Num64(0x5be0cd19, 0x137e2179) ];
+  this.h = [ 0x6a09e667, 0xf3bcc908,
+             0xbb67ae85, 0x84caa73b,
+             0x3c6ef372, 0xfe94f82b,
+             0xa54ff53a, 0x5f1d36f1,
+             0x510e527f, 0xade682d1,
+             0x9b05688c, 0x2b3e6c1f,
+             0x1f83d9ab, 0xfb41bd6b,
+             0x5be0cd19, 0x137e2179 ];
   this.k = sha512_K;
-  this.W = new Array(80);
+  this.W = new Array(160);
 }
 utils.inherits(SHA512, BlockHash);
 exports.sha512 = SHA512;
@@ -5813,53 +5922,127 @@ SHA512.outSize = 512;
 SHA512.hmacStrength = 192;
 SHA512.padLength = 128;
 
-SHA512.prototype._update = function _update(msg, start) {
+SHA512.prototype._prepareBlock = function _prepareBlock(msg, start) {
   var W = this.W;
 
   // 32 x 32bit words
-  for (var i = 0; i < 16; i++)
-    W[i] = new Num64(msg[start + 2 * i], msg[start + 2 * i + 1]);
-  for (; i < W.length; i++)
-    W[i] = g1_512(W[i - 2]).sum3(W[i - 7], g0_512(W[i - 15]), W[i - 16]);
+  for (var i = 0; i < 32; i++)
+    W[i] = msg[start + i];
+  for (; i < W.length; i += 2) {
+    var c0_hi = g1_512_hi(W[i - 4], W[i - 3]);  // i - 2
+    var c0_lo = g1_512_lo(W[i - 4], W[i - 3]);
+    var c1_hi = W[i - 14];  // i - 7
+    var c1_lo = W[i - 13];
+    var c2_hi = g0_512_hi(W[i - 30], W[i - 29]);  // i - 15
+    var c2_lo = g0_512_lo(W[i - 30], W[i - 29]);
+    var c3_hi = W[i - 32];  // i - 16
+    var c3_lo = W[i - 31];
 
-  var a = this.h[0];
-  var b = this.h[1];
-  var c = this.h[2];
-  var d = this.h[3];
-  var e = this.h[4];
-  var f = this.h[5];
-  var g = this.h[6];
-  var h = this.h[7];
+    W[i] = sum64_4_hi(c0_hi, c0_lo,
+                      c1_hi, c1_lo,
+                      c2_hi, c2_lo,
+                      c3_hi, c3_lo);
+    W[i + 1] = sum64_4_lo(c0_hi, c0_lo,
+                          c1_hi, c1_lo,
+                          c2_hi, c2_lo,
+                          c3_hi, c3_lo);
+  }
+};
+
+SHA512.prototype._update = function _update(msg, start) {
+  this._prepareBlock(msg, start);
+
+  var W = this.W;
+
+  var ah = this.h[0];
+  var al = this.h[1];
+  var bh = this.h[2];
+  var bl = this.h[3];
+  var ch = this.h[4];
+  var cl = this.h[5];
+  var dh = this.h[6];
+  var dl = this.h[7];
+  var eh = this.h[8];
+  var el = this.h[9];
+  var fh = this.h[10];
+  var fl = this.h[11];
+  var gh = this.h[12];
+  var gl = this.h[13];
+  var hh = this.h[14];
+  var hl = this.h[15];
 
   assert(this.k.length === W.length);
-  for (var i = 0; i < W.length; i++) {
-    var T1 = h.sum4(s1_512(e), ch64(e, f, g), this.k[i], W[i]);
-    var T2 = s0_512(a).sum(maj64(a, b, c));
-    h = g;
-    g = f;
-    f = e;
-    e = d.sum(T1);
-    d = c;
-    c = b;
-    b = a;
-    a = T1.sum(T2);
+  for (var i = 0; i < W.length; i += 2) {
+    var c0_hi = hh;
+    var c0_lo = hl;
+    var c1_hi = s1_512_hi(eh, el);
+    var c1_lo = s1_512_lo(eh, el);
+    var c2_hi = ch64_hi(eh, el, fh, fl, gh, gl);
+    var c2_lo = ch64_lo(eh, el, fh, fl, gh, gl);
+    var c3_hi = this.k[i];
+    var c3_lo = this.k[i + 1];
+    var c4_hi = W[i];
+    var c4_lo = W[i + 1];
+
+    var T1_hi = sum64_5_hi(c0_hi, c0_lo,
+                           c1_hi, c1_lo,
+                           c2_hi, c2_lo,
+                           c3_hi, c3_lo,
+                           c4_hi, c4_lo);
+    var T1_lo = sum64_5_lo(c0_hi, c0_lo,
+                           c1_hi, c1_lo,
+                           c2_hi, c2_lo,
+                           c3_hi, c3_lo,
+                           c4_hi, c4_lo);
+
+    var c0_hi = s0_512_hi(ah, al);
+    var c0_lo = s0_512_lo(ah, al);
+    var c1_hi = maj64_hi(ah, al, bh, bl, ch, cl);
+    var c1_lo = maj64_lo(ah, al, bh, bl, ch, cl);
+
+    var T2_hi = sum64_hi(c0_hi, c0_lo, c1_hi, c1_lo);
+    var T2_lo = sum64_lo(c0_hi, c0_lo, c1_hi, c1_lo);
+
+    hh = gh;
+    hl = gl;
+
+    gh = fh;
+    gl = fl;
+
+    fh = eh;
+    fl = el;
+
+    eh = sum64_hi(dh, dl, T1_hi, T1_lo);
+    el = sum64_lo(dl, dl, T1_hi, T1_lo);
+
+    dh = ch;
+    dl = cl;
+
+    ch = bh;
+    cl = bl;
+
+    bh = ah;
+    bl = al;
+
+    ah = sum64_hi(T1_hi, T1_lo, T2_hi, T2_lo);
+    al = sum64_lo(T1_hi, T1_lo, T2_hi, T2_lo);
   }
 
-  this.h[0].isum(a);
-  this.h[1].isum(b);
-  this.h[2].isum(c);
-  this.h[3].isum(d);
-  this.h[4].isum(e);
-  this.h[5].isum(f);
-  this.h[6].isum(g);
-  this.h[7].isum(h);
+  sum64(this.h, 0, ah, al);
+  sum64(this.h, 2, bh, bl);
+  sum64(this.h, 4, ch, cl);
+  sum64(this.h, 6, dh, dl);
+  sum64(this.h, 8, eh, el);
+  sum64(this.h, 10, fh, fl);
+  sum64(this.h, 12, gh, gl);
+  sum64(this.h, 14, hh, hl);
 };
 
 SHA512.prototype._digest = function digest(enc) {
   if (enc === 'hex')
-    return utils.toHex64(this.h, 'big');
+    return utils.toHex32(this.h, 'big');
   else
-    return utils.split64(this.h, 'big');
+    return utils.split32(this.h, 'big');
 };
 
 function SHA384() {
@@ -5867,14 +6050,14 @@ function SHA384() {
     return new SHA384();
 
   SHA512.call(this);
-  this.h = [ new Num64(0xcbbb9d5d, 0xc1059ed8),
-             new Num64(0x629a292a, 0x367cd507),
-             new Num64(0x9159015a, 0x3070dd17),
-             new Num64(0x152fecd8, 0xf70e5939),
-             new Num64(0x67332667, 0xffc00b31),
-             new Num64(0x8eb44a87, 0x68581511),
-             new Num64(0xdb0c2e0d, 0x64f98fa7),
-             new Num64(0x47b5481d, 0xbefa4fa4) ];
+  this.h = [ 0xcbbb9d5d, 0xc1059ed8,
+             0x629a292a, 0x367cd507,
+             0x9159015a, 0x3070dd17,
+             0x152fecd8, 0xf70e5939,
+             0x67332667, 0xffc00b31,
+             0x8eb44a87, 0x68581511,
+             0xdb0c2e0d, 0x64f98fa7,
+             0x47b5481d, 0xbefa4fa4 ];
 }
 utils.inherits(SHA384, SHA512);
 exports.sha384 = SHA384;
@@ -5886,9 +6069,9 @@ SHA384.padLength = 128;
 
 SHA384.prototype._digest = function digest(enc) {
   if (enc === 'hex')
-    return utils.toHex64(this.h.slice(0, 6), 'big');
+    return utils.toHex32(this.h.slice(0, 12), 'big');
   else
-    return utils.split64(this.h.slice(0, 6), 'big');
+    return utils.split32(this.h.slice(0, 12), 'big');
 };
 
 function SHA1() {
@@ -5985,34 +6168,120 @@ function ft_1(s, x, y, z) {
     return maj32(x, y, z);
 }
 
-function ch64(x, y, z) {
-  return new Num64(
-    (x.hi & y.hi) ^ ((~x.hi) & z.hi),
-    (x.lo & y.lo) ^ ((~x.lo) & z.lo)
-  );
+function ch64_hi(xh, xl, yh, yl, zh, zl) {
+  var r = (xh & yh) ^ ((~xh) & zh);
+  if (r < 0)
+    r += 0x100000000;
+  return r;
 }
 
-function maj64(x, y, z) {
-  return new Num64(
-    (x.hi & y.hi) ^ (x.hi & z.hi) ^ (y.hi & z.hi),
-    (x.lo & y.lo) ^ (x.lo & z.lo) ^ (y.lo & z.lo)
-  );
+function ch64_lo(xh, xl, yh, yl, zh, zl) {
+  var r = (xl & yl) ^ ((~xl) & zl);
+  if (r < 0)
+    r += 0x100000000;
+  return r;
 }
 
-function s0_512(x, y, z) {
-  return x.rotr(28).xor2(x.rotr(34), x.rotr(39));
+function maj64_hi(xh, xl, yh, yl, zh, zl) {
+  var r = (xh & yh) ^ (xh & zh) ^ (yh & zh);
+  if (r < 0)
+    r += 0x100000000;
+  return r;
 }
 
-function s1_512(x, y, z) {
-  return x.rotr(14).xor2(x.rotr(18), x.rotr(41));
+function maj64_lo(xh, xl, yh, yl, zh, zl) {
+  var r = (xl & yl) ^ (xl & zl) ^ (yl & zl);
+  if (r < 0)
+    r += 0x100000000;
+  return r;
 }
 
-function g0_512(x, y, z) {
-  return x.rotr(1).xor2(x.rotr(8), x.shr(7));
+function s0_512_hi(xh, xl) {
+  var c0_hi = rotr64_hi(xh, xl, 28);
+  var c1_hi = rotr64_hi(xl, xh, 2);  // 34
+  var c2_hi = rotr64_hi(xl, xh, 7);  // 39
+
+  var r = c0_hi ^ c1_hi ^ c2_hi;
+  if (r < 0)
+    r += 0x100000000;
+  return r;
 }
 
-function g1_512(x, y, z) {
-  return x.rotr(19).xor2(x.rotr(61), x.shr(6));
+function s0_512_lo(xh, xl) {
+  var c0_lo = rotr64_lo(xh, xl, 28);
+  var c1_lo = rotr64_lo(xl, xh, 2);  // 34
+  var c2_lo = rotr64_lo(xl, xh, 7);  // 39
+
+  var r = c0_lo ^ c1_lo ^ c2_lo;
+  if (r < 0)
+    r += 0x100000000;
+  return r;
+}
+
+function s1_512_hi(xh, xl) {
+  var c0_hi = rotr64_hi(xh, xl, 14);
+  var c1_hi = rotr64_hi(xh, xl, 18);
+  var c2_hi = rotr64_hi(xl, xh, 9);  // 41
+
+  var r = c0_hi ^ c1_hi ^ c2_hi;
+  if (r < 0)
+    r += 0x100000000;
+  return r;
+}
+
+function s1_512_lo(xh, xl) {
+  var c0_lo = rotr64_lo(xh, xl, 14);
+  var c1_lo = rotr64_lo(xh, xl, 18);
+  var c2_lo = rotr64_lo(xl, xh, 9);  // 41
+
+  var r = c0_lo ^ c1_lo ^ c2_lo;
+  if (r < 0)
+    r += 0x100000000;
+  return r;
+}
+
+function g0_512_hi(xh, xl) {
+  var c0_hi = rotr64_hi(xh, xl, 1);
+  var c1_hi = rotr64_hi(xh, xl, 8);
+  var c2_hi = shr64_hi(xh, xl, 7);
+
+  var r = c0_hi ^ c1_hi ^ c2_hi;
+  if (r < 0)
+    r += 0x100000000;
+  return r;
+}
+
+function g0_512_lo(xh, xl) {
+  var c0_lo = rotr64_lo(xh, xl, 1);
+  var c1_lo = rotr64_lo(xh, xl, 8);
+  var c2_lo = shr64_lo(xh, xl, 7);
+
+  var r = c0_lo ^ c1_lo ^ c2_lo;
+  if (r < 0)
+    r += 0x100000000;
+  return r;
+}
+
+function g1_512_hi(xh, xl) {
+  var c0_hi = rotr64_hi(xh, xl, 19);
+  var c1_hi = rotr64_hi(xl, xh, 29);  // 61
+  var c2_hi = shr64_hi(xh, xl, 6);
+
+  var r = c0_hi ^ c1_hi ^ c2_hi;
+  if (r < 0)
+    r += 0x100000000;
+  return r;
+}
+
+function g1_512_lo(xh, xl) {
+  var c0_lo = rotr64_lo(xh, xl, 19);
+  var c1_lo = rotr64_lo(xl, xh, 29);  // 61
+  var c2_lo = shr64_lo(xh, xl, 6);
+
+  var r = c0_lo ^ c1_lo ^ c2_lo;
+  if (r < 0)
+    r += 0x100000000;
+  return r;
 }
 
 },{"../hash":15}],20:[function(_dereq_,module,exports){
@@ -6064,9 +6333,7 @@ function htonl(w) {
             ((w >>> 8) & 0xff00) |
             ((w << 8) & 0xff0000) |
             ((w & 0xff) << 24);
-  if (res < 0)
-    res += 0x100000000;
-  return res;
+  return res >>> 0;
 }
 utils.htonl = htonl;
 
@@ -6081,23 +6348,6 @@ function toHex32(msg, endian) {
   return res;
 }
 utils.toHex32 = toHex32;
-
-function toHex64(msg, endian) {
-  var res = '';
-  for (var i = 0; i < msg.length; i++) {
-    var hi = msg[i].hi;
-    var lo = msg[i].lo;
-    if (endian === 'little') {
-      hi = htonl(hi);
-      lo = htonl(lo);
-      res += zero8(lo.toString(16)) + zero8(hi.toString(16));
-    } else {
-      res += zero8(hi.toString(16)) + zero8(lo.toString(16));
-    }
-  }
-  return res;
-}
-utils.toHex64 = toHex64;
 
 function zero2(word) {
   if (word.length === 1)
@@ -6137,9 +6387,7 @@ function join32(msg, start, end, endian) {
       w = (msg[k] << 24) | (msg[k + 1] << 16) | (msg[k + 2] << 8) | msg[k + 3];
     else
       w = (msg[k + 3] << 24) | (msg[k + 2] << 16) | (msg[k + 1] << 8) | msg[k];
-    if (w < 0)
-      w += 0x100000000;
-    res[i] = w;
+    res[i] = w >>> 0;
   }
   return res;
 }
@@ -6165,35 +6413,6 @@ function split32(msg, endian) {
 }
 utils.split32 = split32;
 
-function split64(msg, endian) {
-  var res = new Array(msg.length * 8);
-  for (var i = 0, k = 0; i < msg.length; i++, k += 8) {
-    var hi = msg[i].hi;
-    var lo = msg[i].lo;
-    if (endian === 'big') {
-      res[k] = hi >>> 24;
-      res[k + 1] = (hi >>> 16) & 0xff;
-      res[k + 2] = (hi >>> 8) & 0xff;
-      res[k + 3] = hi & 0xff;
-      res[k + 4] = lo >>> 24;
-      res[k + 5] = (lo >>> 16) & 0xff;
-      res[k + 6] = (lo >>> 8) & 0xff;
-      res[k + 7] = lo & 0xff;
-    } else {
-      res[k + 7] = hi >>> 24;
-      res[k + 6] = (hi >>> 16) & 0xff;
-      res[k + 5] = (hi >>> 8) & 0xff;
-      res[k + 4] = hi & 0xff;
-      res[k + 3] = lo >>> 24;
-      res[k + 2] = (lo >>> 16) & 0xff;
-      res[k + 1] = (lo >>> 8) & 0xff;
-      res[k] = lo & 0xff;
-    }
-  }
-  return res;
-}
-utils.split64 = split64;
-
 function rotr32(w, b) {
   return (w >>> b) | (w << (32 - b));
 }
@@ -6205,34 +6424,22 @@ function rotl32(w, b) {
 utils.rotl32 = rotl32;
 
 function sum32(a, b) {
-  var r = (a + b) & 0xffffffff;
-  if (r < 0)
-    r += 0x100000000;
-  return r;
+  return (a + b) >>> 0;
 }
 utils.sum32 = sum32;
 
 function sum32_3(a, b, c) {
-  var r = (a + b + c) & 0xffffffff;
-  if (r < 0)
-    r += 0x100000000;
-  return r;
+  return (a + b + c) >>> 0;
 }
 utils.sum32_3 = sum32_3;
 
 function sum32_4(a, b, c, d) {
-  var r = (a + b + c + d) & 0xffffffff;
-  if (r < 0)
-    r += 0x100000000;
-  return r;
+  return (a + b + c + d) >>> 0;
 }
 utils.sum32_4 = sum32_4;
 
 function sum32_5(a, b, c, d, e) {
-  var r = (a + b + c + d + e) & 0xffffffff;
-  if (r < 0)
-    r += 0x100000000;
-  return r;
+  return (a + b + c + d + e) >>> 0;
 }
 utils.sum32_5 = sum32_5;
 
@@ -6244,83 +6451,97 @@ utils.assert = assert;
 
 utils.inherits = inherits;
 
-function Num64(hi, lo) {
-  if (hi < 0)
-    this.hi = hi + 0x100000000;
-  else
-    this.hi = hi;
-  if (lo < 0)
-    this.lo = lo + 0x100000000;
-  else
-    this.lo = lo;
+function sum64(buf, pos, ah, al) {
+  var bh = buf[pos];
+  var bl = buf[pos + 1];
+
+  var lo = (al + bl) >>> 0;
+  var hi = (lo < al ? 1 : 0) + ah + bh;
+  buf[pos] = hi >>> 0;
+  buf[pos + 1] = lo;
 }
-utils.Num64 = Num64;
+exports.sum64 = sum64;
 
-Num64.prototype.inspect = function inspect() {
-  return '0x' + zero8(this.hi.toString(16)) + zero8(this.lo.toString(16));
+function sum64_hi(ah, al, bh, bl) {
+  var lo = (al + bl) >>> 0;
+  var hi = (lo < al ? 1 : 0) + ah + bh;
+  return hi >>> 0;
 };
+exports.sum64_hi = sum64_hi;
 
-Num64.prototype.clone = function clone() {
-  return new Num64(this.hi, this.lo);
+function sum64_lo(ah, al, bh, bl) {
+  var lo = al + bl;
+  return lo >>> 0;
 };
+exports.sum64_lo = sum64_lo;
 
-Num64.prototype.xor2 = function xor2(a, b) {
-  return new Num64(
-    a.hi ^ b.hi ^ this.hi,
-    a.lo ^ b.lo ^ this.lo
-  );
+function sum64_4_hi(ah, al, bh, bl, ch, cl, dh, dl) {
+  var carry = 0;
+  var lo = al;
+  lo = (lo + bl) >>> 0;
+  carry += lo < al ? 1 : 0;
+  lo = (lo + cl) >>> 0;
+  carry += lo < cl ? 1 : 0;
+  lo = (lo + dl) >>> 0;
+  carry += lo < dl ? 1 : 0;
+
+  var hi = ah + bh + ch + dh + carry;
+  return hi >>> 0;
 };
+exports.sum64_4_hi = sum64_4_hi;
 
-Num64.prototype.sum3 = function sum3(a, b, c) {
-  return this.clone().isum(a).isum(b).isum(c);
+function sum64_4_lo(ah, al, bh, bl, ch, cl, dh, dl) {
+  var lo = al + bl + cl + dl;
+  return lo >>> 0;
 };
+exports.sum64_4_lo = sum64_4_lo;
 
-Num64.prototype.sum4 = function sum4(a, b, c, d) {
-  return this.clone().isum(a).isum(b).isum(c).isum(d);
+function sum64_5_hi(ah, al, bh, bl, ch, cl, dh, dl, eh, el) {
+  var carry = 0;
+  var lo = al;
+  lo = (lo + bl) >>> 0;
+  carry += lo < al ? 1 : 0;
+  lo = (lo + cl) >>> 0;
+  carry += lo < cl ? 1 : 0;
+  lo = (lo + dl) >>> 0;
+  carry += lo < dl ? 1 : 0;
+  lo = (lo + el) >>> 0;
+  carry += lo < el ? 1 : 0;
+
+  var hi = ah + bh + ch + dh + eh + carry;
+  return hi >>> 0;
 };
+exports.sum64_5_hi = sum64_5_hi;
 
-Num64.prototype.rotr = function rotr(num) {
-  if (num >= 32)
-    return new Num64(this.lo, this.hi).rotr(num - 32);
+function sum64_5_lo(ah, al, bh, bl, ch, cl, dh, dl, eh, el) {
+  var lo = al + bl + cl + dl + el;
 
-  // num < 32
-  var mask = (1 << num) - 1;
-  var rnum = 32 - num;
-  return new Num64(
-    ((this.lo & mask) << rnum) | (this.hi >>> num),
-    ((this.hi & mask) << rnum) | (this.lo >>> num)
-  );
+  return lo >>> 0;
 };
+exports.sum64_5_lo = sum64_5_lo;
 
-Num64.prototype.shr = function shr(num) {
-  if (num >= 32)
-    return new Num64(0, this.hi).shr(num - 32);
-
-  // num < 32
-  var mask = (1 << num) - 1;
-  return new Num64(
-    this.hi >>> num,
-    ((this.hi & mask) << (32 - num)) | (this.lo >>> num)
-  );
+function rotr64_hi(ah, al, num) {
+  var r = (al << (32 - num)) | (ah >>> num);
+  return r >>> 0;
 };
+exports.rotr64_hi = rotr64_hi;
 
-Num64.prototype.isum = function isum(num) {
-  var lo = this.lo + num.lo;
-  var hi = (((lo / 0x100000000) | 0) + this.hi + num.hi) & 0xffffffff;
-
-  this.hi = hi;
-  this.lo = lo & 0xffffffff;
-  if (this.hi < 0)
-    this.hi += 0x100000000;
-  if (this.lo < 0)
-    this.lo += 0x100000000;
-
-  return this;
+function rotr64_lo(ah, al, num) {
+  var r = (ah << (32 - num)) | (al >>> num);
+  return r >>> 0;
 };
+exports.rotr64_lo = rotr64_lo;
 
-Num64.prototype.sum = function sum(num) {
-  return this.clone().isum(num);
+function shr64_hi(ah, al, num) {
+  return ah >>> num;
 };
+exports.shr64_hi = shr64_hi;
+
+function shr64_lo(ah, al, num) {
+  var r = (ah << (32 - num)) | (al >>> num);
+  return r >>> 0;
+};
+exports.shr64_lo = shr64_lo;
 
 },{"inherits":21}],21:[function(_dereq_,module,exports){
 if (typeof Object.create === 'function') {
@@ -6350,7 +6571,7 @@ if (typeof Object.create === 'function') {
 },{}],22:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
@@ -6374,11 +6595,11 @@ module.exports={
   "homepage": "https://github.com/indutny/elliptic",
   "devDependencies": {
     "browserify": "^3.44.2",
-    "mocha": "^1.18.2",
+    "mocha": "^2.1.0",
     "uglify-js": "^2.4.13"
   },
   "dependencies": {
-    "bn.js": "^1.0.0",
+    "bn.js": "^1.2.4",
     "brorand": "^1.0.1",
     "hash.js": "^1.0.0",
     "inherits": "^2.0.1"
