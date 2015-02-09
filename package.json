@@ -1,6 +1,6 @@
 {
   "name": "elliptic",
-  "version": "2.0.2",
+  "version": "3.0.0",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
