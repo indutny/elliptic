@@ -23,8 +23,13 @@
   },
   "homepage": "https://github.com/indutny/elliptic",
   "devDependencies": {
+    "benchmark": "^1.0.0",
     "browserify": "^3.44.2",
+    "eccjs": "^0.3.1",
+    "ecdsa": "^0.6.0",
+    "eckey": "^0.8.0",
     "mocha": "^2.1.0",
+    "secp256k1": "0.0.15",
     "uglify-js": "^2.4.13"
   },
   "dependencies": {
