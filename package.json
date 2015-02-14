@@ -4,7 +4,7 @@
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
-    "test": "jscs lib/**/*.js && jshint lib/**/*.js && mocha --reporter=spec test/*-test.js"
+    "test": "make lint && mocha --reporter=spec test/*-test.js"
   },
   "repository": {
     "type": "git",
