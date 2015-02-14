@@ -2816,7 +2816,7 @@ EC.prototype.sign = function sign(msg, key, enc, options) {
     if (options.canonical && s.cmp(this.nh) > 0)
       s = this.n.sub(s);
 
-    return new Signature(r, s);
+    return new Signature({ r: r, s: s });
   } while (true);
 };
 
@@ -2941,7 +2941,7 @@ KeyPair.prototype.getPrivate = function getPrivate(enc) {
 };
 
 KeyPair.prototype._importPrivate = function _importPrivate(key, enc) {
-  this.priv = new bn(key, 16);
+  this.priv = new bn(key, enc || 16);
 
   // Ensure that the priv won't be bigger than n, otherwise we may fail
   // in fixed multiplication method
@@ -3003,16 +3003,16 @@ var elliptic = _dereq_('../../elliptic');
 var utils = elliptic.utils;
 var assert = utils.assert;
 
-function Signature(r, s) {
-  if (r instanceof Signature)
-    return r;
+function Signature(options, enc) {
+  if (options instanceof Signature)
+    return options;
 
-  if (this._importDER(r, s))
+  if (this._importDER(options, enc))
     return;
 
-  assert(r && s, 'Signature without r or s');
-  this.r = new bn(r, 16);
-  this.s = new bn(s, 16);
+  assert(options.r && options.s, 'Signature without r or s');
+  this.r = new bn(options.r, 16);
+  this.s = new bn(options.s, 16);
 }
 module.exports = Signature;
 
@@ -3328,7 +3328,7 @@ function getJSF(k1, k2) {
 utils.getJSF = getJSF;
 
 },{"bn.js":13}],13:[function(_dereq_,module,exports){
-(function(module, exports) {
+(function (module, exports) {
 
 'use strict';
 
@@ -3756,50 +3756,60 @@ BN.prototype.toArray = function toArray() {
   return res;
 };
 
-/*
-function genCountBits(bits) {
-  var arr = [];
+if (Math.clz32) {
+  BN.prototype._countBits = function _countBits(w) {
+    return 32 - Math.clz32(w);
+  };
+} else {
+  BN.prototype._countBits = function _countBits(w) {
+    var t = w;
+    var r = 0;
+    if (t >= 0x1000) {
+      r += 13;
+      t >>>= 13;
+    }
+    if (t >= 0x40) {
+      r += 7;
+      t >>>= 7;
+    }
+    if (t >= 0x8) {
+      r += 4;
+      t >>>= 4;
+    }
+    if (t >= 0x02) {
+      r += 2;
+      t >>>= 2;
+    }
+    return r + t;
+  };
+}
 
-  for (var i = bits - 1; i >= 0; i--) {
-    var bit = '0x' + (1 << i).toString(16);
-    arr.push('w >= ' + bit + ' ? ' + (i + 1));
+BN.prototype._zeroBits = function _zeroBits(w) {
+  // Short-cut
+  if (w === 0)
+    return 26;
+
+  var t = w;
+  var r = 0;
+  if ((t & 0x1fff) === 0) {
+    r += 13;
+    t >>>= 13;
   }
-
-  return new Function('w', 'return ' + arr.join(' :\n') + ' :\n0;');
-};
-
-BN.prototype._countBits = genCountBits(26);
-*/
-
-// Sadly chrome apps could not contain `new Function()` calls
-BN.prototype._countBits = function _countBits(w) {
-  return w >= 0x2000000 ? 26 :
-         w >= 0x1000000 ? 25 :
-         w >= 0x800000 ? 24 :
-         w >= 0x400000 ? 23 :
-         w >= 0x200000 ? 22 :
-         w >= 0x100000 ? 21 :
-         w >= 0x80000 ? 20 :
-         w >= 0x40000 ? 19 :
-         w >= 0x20000 ? 18 :
-         w >= 0x10000 ? 17 :
-         w >= 0x8000 ? 16 :
-         w >= 0x4000 ? 15 :
-         w >= 0x2000 ? 14 :
-         w >= 0x1000 ? 13 :
-         w >= 0x800 ? 12 :
-         w >= 0x400 ? 11 :
-         w >= 0x200 ? 10 :
-         w >= 0x100 ? 9 :
-         w >= 0x80 ? 8 :
-         w >= 0x40 ? 7 :
-         w >= 0x20 ? 6 :
-         w >= 0x10 ? 5 :
-         w >= 0x8 ? 4 :
-         w >= 0x4 ? 3 :
-         w >= 0x2 ? 2 :
-         w >= 0x1 ? 1 :
-         0;
+  if ((t & 0x7f) === 0) {
+    r += 7;
+    t >>>= 7;
+  }
+  if ((t & 0xf) === 0) {
+    r += 4;
+    t >>>= 4;
+  }
+  if ((t & 0x3) === 0) {
+    r += 2;
+    t >>>= 2;
+  }
+  if ((t & 0x1) === 0)
+    r++;
+  return r;
 };
 
 // Return number of used bits in a BN
@@ -3808,6 +3818,21 @@ BN.prototype.bitLength = function bitLength() {
   var w = this.words[this.length - 1];
   var hi = this._countBits(w);
   return (this.length - 1) * 26 + hi;
+};
+
+// Number of trailing zero bits
+BN.prototype.zeroBits = function zeroBits() {
+  if (this.cmpn(0) === 0)
+    return 0;
+
+  var r = 0;
+  for (var i = 0; i < this.length; i++) {
+    var b = this._zeroBits(this.words[i]);
+    r += b;
+    if (b !== 26)
+      break;
+  }
+  return r;
 };
 
 BN.prototype.byteLength = function byteLength() {
@@ -3823,6 +3848,115 @@ BN.prototype.neg = function neg() {
   r.sign = !this.sign;
   return r;
 };
+
+
+// Or `num` with `this` in-place
+BN.prototype.ior = function ior(num) {
+  this.sign = this.sign || num.sign;
+
+  while (this.length < num.length)
+    this.words[this.length++] = 0;
+
+  for (var i = 0; i < num.length; i++)
+    this.words[i] = this.words[i] | num.words[i];
+
+  return this.strip();
+};
+
+
+// Or `num` with `this`
+BN.prototype.or = function or(num) {
+  if (this.length > num.length)
+    return this.clone().ior(num);
+  else
+    return num.clone().ior(this);
+};
+
+
+// And `num` with `this` in-place
+BN.prototype.iand = function iand(num) {
+  this.sign = this.sign && num.sign;
+
+  // b = min-length(num, this)
+  var b;
+  if (this.length > num.length)
+    b = num;
+  else
+    b = this;
+
+  for (var i = 0; i < b.length; i++)
+    this.words[i] = this.words[i] & num.words[i];
+
+  this.length = b.length;
+
+  return this.strip();
+};
+
+
+// And `num` with `this`
+BN.prototype.and = function and(num) {
+  if (this.length > num.length)
+    return this.clone().iand(num);
+  else
+    return num.clone().iand(this);
+};
+
+
+// Xor `num` with `this` in-place
+BN.prototype.ixor = function ixor(num) {
+  this.sign = this.sign || num.sign;
+
+  // a.length > b.length
+  var a;
+  var b;
+  if (this.length > num.length) {
+    a = this;
+    b = num;
+  } else {
+    a = num;
+    b = this;
+  }
+
+  for (var i = 0; i < b.length; i++)
+    this.words[i] = a.words[i] ^ b.words[i];
+
+  if (this !== a)
+    for (; i < a.length; i++)
+      this.words[i] = a.words[i];
+
+  this.length = a.length;
+
+  return this.strip();
+};
+
+
+// Xor `num` with `this`
+BN.prototype.xor = function xor(num) {
+  if (this.length > num.length)
+    return this.clone().ixor(num);
+  else
+    return num.clone().ixor(this);
+};
+
+
+// Set `bit` of `this`
+BN.prototype.setn = function setn(bit, val) {
+  assert(typeof bit === 'number' && bit >= 0);
+
+  var off = (bit / 26) | 0;
+  var wbit = bit % 26;
+
+  while (this.length <= off)
+    this.words[this.length++] = 0;
+
+  if (val)
+    this.words[off] = this.words[off] | (1 << wbit);
+  else
+    this.words[off] = this.words[off] & ~(1 << wbit);
+
+  return this.strip();
+};
+
 
 // Add `num` to `this` in-place
 BN.prototype.iadd = function iadd(num) {
@@ -4211,21 +4345,22 @@ BN.prototype.ishln = function ishln(bits) {
 
 // Shift-right in-place
 // NOTE: `hint` is a lowest bit before trailing zeroes
-// NOTE: if `extended` is true - { lo: ..., hi: } object will be returned
+// NOTE: if `extended` is present - it will be filled with destroyed bits
 BN.prototype.ishrn = function ishrn(bits, hint, extended) {
   assert(typeof bits === 'number' && bits >= 0);
+  var h;
   if (hint)
-    hint = (hint - (hint % 26)) / 26;
+    h = (hint - (hint % 26)) / 26;
   else
-    hint = 0;
+    h = 0;
 
   var r = bits % 26;
   var s = Math.min((bits - r) / 26, this.length);
   var mask = 0x3ffffff ^ ((0x3ffffff >>> r) << r);
   var maskedWords = extended;
 
-  hint -= s;
-  hint = Math.max(0, hint);
+  h -= s;
+  h = Math.max(0, h);
 
   // Extended mode, copy masked part
   if (maskedWords) {
@@ -4246,7 +4381,7 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
   }
 
   var carry = 0;
-  for (var i = this.length - 1; i >= 0 && (carry !== 0 || i >= hint); i--) {
+  for (var i = this.length - 1; i >= 0 && (carry !== 0 || i >= h); i--) {
     var word = this.words[i];
     this.words[i] = (carry << (26 - r)) | (word >>> r);
     carry = word & mask;
@@ -4262,8 +4397,6 @@ BN.prototype.ishrn = function ishrn(bits, hint, extended) {
   }
 
   this.strip();
-  if (extended)
-    return { hi: this, lo: maskedWords };
 
   return this;
 };
@@ -4459,8 +4592,8 @@ BN.prototype._wordDiv = function _wordDiv(num, mode) {
 
   // Normalize
   var bhi = b.words[b.length - 1];
-  for (var shift = 0; bhi < 0x2000000; shift++)
-    bhi <<= 1;
+  var bhiBits = this._countBits(bhi);
+  shift = 26 - bhiBits;
   if (shift !== 0) {
     b = b.shln(shift);
     a.ishln(shift);
@@ -4620,7 +4753,82 @@ BN.prototype.divn = function divn(num) {
   return this.clone().idivn(num);
 };
 
-BN.prototype._egcd = function _egcd(x1, p) {
+BN.prototype.egcd = function egcd(p) {
+  assert(!p.sign);
+  assert(p.cmpn(0) !== 0);
+
+  var x = this;
+  var y = p.clone();
+
+  if (x.sign)
+    x = x.mod(p);
+  else
+    x = x.clone();
+
+  // A * x + B * y = x
+  var A = new BN(1);
+  var B = new BN(0);
+
+  // C * x + D * y = y
+  var C = new BN(0);
+  var D = new BN(1);
+
+  var g = 0;
+
+  while (x.isEven() && y.isEven()) {
+    x.ishrn(1);
+    y.ishrn(1);
+    ++g;
+  }
+
+  var yp = y.clone();
+  var xp = x.clone();
+
+  while (x.cmpn(0) !== 0) {
+    while (x.isEven()) {
+      x.ishrn(1);
+      if (A.isEven() && B.isEven()) {
+        A.ishrn(1);
+        B.ishrn(1);
+      } else {
+        A.iadd(yp).ishrn(1);
+        B.isub(xp).ishrn(1);
+      }
+    }
+
+    while (y.isEven()) {
+      y.ishrn(1);
+      if (C.isEven() && D.isEven()) {
+        C.ishrn(1);
+        D.ishrn(1);
+      } else {
+        C.iadd(yp).ishrn(1);
+        D.isub(xp).ishrn(1);
+      }
+    }
+
+    if (x.cmp(y) >= 0) {
+      x.isub(y);
+      A.isub(C);
+      B.isub(D);
+    } else {
+      y.isub(x);
+      C.isub(A);
+      D.isub(B);
+    }
+  }
+
+  return {
+    a: C,
+    b: D,
+    gcd: y.ishln(g)
+  };
+};
+
+// This is reduced incarnation of the binary EEA
+// above, designated to invert members of the
+// _prime_ fields F(p) at a maximal speed
+BN.prototype._invmp = function _invmp(p) {
   assert(!p.sign);
   assert(p.cmpn(0) !== 0);
 
@@ -4632,10 +4840,11 @@ BN.prototype._egcd = function _egcd(x1, p) {
   else
     a = a.clone();
 
+  var x1 = new BN(1);
   var x2 = new BN(0);
-  while (b.isEven())
-    b.ishrn(1);
+
   var delta = b.clone();
+
   while (a.cmpn(1) > 0 && b.cmpn(1) > 0) {
     while (a.isEven()) {
       a.ishrn(1);
@@ -4682,30 +4891,31 @@ BN.prototype.gcd = function gcd(num) {
     b.ishrn(1);
   }
 
-  while (a.isEven())
-    a.ishrn(1);
-
   do {
+    while (a.isEven())
+      a.ishrn(1);
     while (b.isEven())
       b.ishrn(1);
 
-    // Swap `a` and `b` to make `a` always bigger than `b`
-    if (a.cmp(b) < 0) {
+    var r = a.cmp(b);
+    if (r < 0) {
+      // Swap `a` and `b` to make `a` always bigger than `b`
       var t = a;
       a = b;
       b = t;
+    } else if (r === 0 || b.cmpn(1) === 0) {
+      break;
     }
-    a.isub(a.div(b).mul(b));
-  } while (a.cmpn(0) !== 0 && b.cmpn(0) !== 0);
-  if (a.cmpn(0) === 0)
-    return b.ishln(shift);
-  else
-    return a.ishln(shift);
+
+    a.isub(b);
+  } while (true);
+
+  return b.ishln(shift);
 };
 
 // Invert number in the field F(num)
 BN.prototype.invm = function invm(num) {
-  return this._egcd(new BN(1), num).mod(num);
+  return this.egcd(num).a.mod(num);
 };
 
 BN.prototype.isEven = function isEven() {
@@ -4955,13 +5165,13 @@ MPrime.prototype.ireduce = function ireduce(num) {
   var rlen;
 
   do {
-    var pair = r.ishrn(this.n, 0, this.tmp);
-    r = this.imulK(pair.hi);
-    r = r.iadd(pair.lo);
+    this.split(r, this.tmp);
+    r = this.imulK(r);
+    r = r.iadd(this.tmp);
     rlen = r.bitLength();
   } while (rlen > this.n);
 
-  var cmp = rlen < this.n ? -1 : r.cmp(this.p);
+  var cmp = rlen < this.n ? -1 : r.ucmp(this.p);
   if (cmp === 0) {
     r.words[0] = 0;
     r.length = 1;
@@ -4972,6 +5182,10 @@ MPrime.prototype.ireduce = function ireduce(num) {
   }
 
   return r;
+};
+
+MPrime.prototype.split = function split(input, out) {
+  input.ishrn(this.n, 0, out);
 };
 
 MPrime.prototype.imulK = function imulK(num) {
@@ -4985,6 +5199,34 @@ function K256() {
     'ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff fffffffe fffffc2f');
 }
 inherits(K256, MPrime);
+
+K256.prototype.split = function split(input, output) {
+  // 256 = 9 * 26 + 22
+  var mask = 0x3fffff;
+
+  var outLen = Math.min(input.length, 9);
+  for (var i = 0; i < outLen; i++)
+    output.words[i] = input.words[i];
+  output.length = outLen;
+
+  if (input.length <= 9) {
+    input.words[0] = 0;
+    input.length = 1;
+    return;
+  }
+
+  // Shift by 9 limbs
+  var prev = input.words[9];
+  output.words[output.length++] = prev & mask;
+
+  for (var i = 10; i < input.length; i++) {
+    var next = input.words[i];
+    input.words[i - 10] = ((next & mask) << 4) | (prev >>> 22);
+    prev = next;
+  }
+  input.words[i - 10] = prev >>> 22;
+  input.length -= 9;
+};
 
 K256.prototype.imulK = function imulK(num) {
   // K = 0x1000003d1 = [ 0x40, 0x3d1 ]
@@ -5232,7 +5474,7 @@ Red.prototype.sqrt = function sqrt(a) {
 };
 
 Red.prototype.invm = function invm(a) {
-  var inv = a._egcd(new BN(1), this.m);
+  var inv = a._invmp(this.m);
   if (inv.sign) {
     inv.sign = false;
     return this.imod(inv).redNeg();
@@ -5292,7 +5534,7 @@ function Mont(m) {
     this.shift += 26 - (this.shift % 26);
   this.r = new BN(1).ishln(this.shift);
   this.r2 = this.imod(this.r.sqr());
-  this.rinv = this.r.invm(this.m);
+  this.rinv = this.r._invmp(this.m);
 
   this.minv = this.rinv.mul(this.r).isubn(1).div(this.m);
   this.minv.sign = true;
@@ -5347,7 +5589,7 @@ Mont.prototype.mul = function mul(a, b) {
 
 Mont.prototype.invm = function invm(a) {
   // (AR)^-1 * R^2 = (A^-1 * R^-1) * R^2 = A^-1 * R
-  var res = this.imod(a.invm(this.m).mul(this.r2));
+  var res = this.imod(a._invmp(this.m).mul(this.r2));
   return res._forceRed(this);
 };
 
@@ -6571,7 +6813,7 @@ if (typeof Object.create === 'function') {
 },{}],22:[function(_dereq_,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "2.0.2",
+  "version": "3.0.2",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "scripts": {
@@ -6599,7 +6841,7 @@ module.exports={
     "uglify-js": "^2.4.13"
   },
   "dependencies": {
-    "bn.js": "^1.2.4",
+    "bn.js": "^2.0.0",
     "brorand": "^1.0.1",
     "hash.js": "^1.0.0",
     "inherits": "^2.0.1"
