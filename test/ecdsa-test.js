@@ -207,4 +207,14 @@ describe('ECDSA', function() {
       keys.getPrivate('hex'),
       '6160edb2b218b7f1394b9ca8eb65a72831032a1f2f3dc2d99291c2f7950ed887');
   });
+
+  it('should recover the public key from a signature', function(){
+    var ec = new elliptic.ec('secp256k1');
+    var key = ec.genKeyPair();
+    var msg = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ];
+    var signature = key.sign(msg);
+    var recid = ec.getKeyRecoveryParam(msg, signature, key.getPublic());
+    var r =  ec.recoverPubKey(msg, signature, recid);
+    assert(key.getPublic().eq(r), 'the keys should match');
+  });
 });
