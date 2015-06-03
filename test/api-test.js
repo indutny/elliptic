@@ -6,11 +6,11 @@ describe('EC API', function() {
     var ec = new elliptic.ec('secp256k1');
 
     assert(ec);
-    assert(typeof(ec) == "object");
+    assert(typeof ec === 'object');
   });
 
   it('should throw error with invalid curve', function() {
-    assert.throws(function(){
+    assert.throws(function() {
       var ec = new elliptic.ec('nonexistent-curve');
     }, Error);
   });
