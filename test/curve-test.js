@@ -80,7 +80,24 @@ describe('Curve', function() {
     assert(g1.precomputed);
     var g2 = curve.point(g1.getX(), g1.getY()); // not precomputed g
     assert(!g2.precomputed);
-    var a = new bn('6d1229a6b24c2e775c062870ad26bc261051e0198c67203167273c7c62538846', 16);
+    var a = new bn(
+        '6d1229a6b24c2e775c062870ad26bc261051e0198c67203167273c7c62538846', 16);
+    var p1 = g1.mul(a);
+    var p2 = g2.mul(a);
+    assert(p1.eq(p2));
+  });
+
+  it('should not use fixed NAF when k is too large', function() {
+    var curve = elliptic.curves.secp256k1.curve;
+    var g1 = curve.g; // precomputed g
+    assert(g1.precomputed);
+    var g2 = curve.point(g1.getX(), g1.getY()); // not precomputed g
+    assert(!g2.precomputed);
+
+    var a = new bn(
+        '6d1229a6b24c2e775c062870ad26bc26' +
+            '1051e0198c67203167273c7c6253884612345678',
+        16);
     var p1 = g1.mul(a);
     var p2 = g2.mul(a);
     assert(p1.eq(p2));
@@ -88,8 +105,10 @@ describe('Curve', function() {
 
   it('should not fail on secp256k1 regression', function() {
     var curve = elliptic.curves.secp256k1.curve;
-    var k1 = new bn('32efeba414cd0c830aed727749e816a01c471831536fd2fce28c56b54f5a3bb1', 16);
-    var k2 = new bn('5f2e49b5d64e53f9811545434706cde4de528af97bfd49fde1f6cf792ee37a8c', 16);
+    var k1 = new bn(
+        '32efeba414cd0c830aed727749e816a01c471831536fd2fce28c56b54f5a3bb1', 16);
+    var k2 = new bn(
+        '5f2e49b5d64e53f9811545434706cde4de528af97bfd49fde1f6cf792ee37a8c', 16);
 
     var p1 = curve.g.mul(k1);
     var p2 = curve.g.mul(k2);
