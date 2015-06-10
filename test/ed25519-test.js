@@ -1,4 +1,4 @@
-/* -------------------------------- REQUIRES -------------------------------- */
+'use strict';
 
 var assert = require('assert');
 var fs = require('fs');
@@ -9,13 +9,9 @@ var utils = elliptic.utils;
 var toArray = elliptic.utils.toArray;
 var eddsa = elliptic.eddsa;
 
-/* --------------------------------- HELPERS -------------------------------- */
-
 function toHex(arr) {
   return elliptic.utils.toHex(arr).toUpperCase();
 }
-
-/* ---------------------------------- TESTS --------------------------------- */
 
 var MAX_PROGRAMMATIC = process.env.CI ? Infinity : 50;
 
@@ -64,17 +60,22 @@ describe('sign.input ed25519 test vectors', function() {
       var split = lines[i].toUpperCase().split(':');
       var key = ed25519.keyFromSecret(split[0].slice(0, 64));
       var expectedPk = split[0].slice(64);
+
       assert.equal(toHex(key.pubBytes()), expectedPk);
+
       var msg = toArray(split[2], 'hex');
       var sig = key.sign(msg).toHex();
       var sigR = sig.slice(0, 64);
       var sigS = sig.slice(64);
+
       assert.equal(sigR, split[3].slice(0, 64));
       assert.equal(sigS, split[3].slice(64, 128));
       assert(key.verify(msg, sig));
+
       var forged = msg.length === 0 ? [0x78] /*ord('x')*/:
                    msg.slice(0, msg.length-1).concat(
                         (msg[(msg.length-1)] + 1) % 256)
+
       assert.equal(msg.length || 1, forged.length);
       assert(!key.verify(forged, sig));
     })
@@ -90,8 +91,8 @@ describe('EDDSA(\'ed25519\')', function() {
     ed25519 = new eddsa('ed25519');
   });
 
-  it('has encBytes of 32', function() {
-    assert.equal(32, ed25519.encBytes);
+  it('has encodingLength of 32', function() {
+    assert.equal(32, ed25519.encodingLength);
   });
 
   it('can sign/verify messages', function() {
@@ -122,8 +123,7 @@ describe('EDDSA(\'ed25519\')', function() {
     it('can be created with keyFromSecret/keyFromPublic', function() {
       var pubKey = ed25519.keyFromPublic(toHex(pair.pubBytes()));
       assert(pubKey.pub() instanceof ed25519.pointClass);
-      assert(pubKey.pub().getX().cmp(pair.pub().getX()) === 0);
-      assert(pubKey.pub().getY().cmp(pair.pub().getY()) === 0);
+      assert(pubKey.pub().eq(pair.pub()));
     });
     it('#getSecret returns bytes with optional encoding', function() {
       assert(Array.isArray(pair.getSecret()));
