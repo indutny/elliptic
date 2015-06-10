@@ -36,7 +36,7 @@ describe('ed25519 derivations', function() {
       var key = ed25519.keyFromSecret(secret);
       assert.equal(toHex(key.privBytes()), test.a_hex);
       var xRecovered = toHex(ed25519.encodeInt(
-                              ed25519.decodePoint(key.pubBytes()).getX()));
+                             ed25519.decodePoint(key.pubBytes()).getX()));
       assert.equal(xRecovered, test.A_P.x);
       assert.equal(toHex(key.pubBytes()), test.A_hex);
     });
