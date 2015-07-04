@@ -38,6 +38,10 @@ describe('ECDSA', function() {
       var signature = ecdsa.sign(msg, keys);
       assert(ecdsa.verify(msg, signature, keys), 'hex-private verify');
 
+      // key.sign(msg, options)
+      var sign = keys.sign('hello', { canonical: true });
+      assert.notEqual(sign.toDER('hex'), keys.sign('hello').toDER('hex'));
+
       // Load public key from compact hex
       var keys = ecdsa.keyFromPublic(keys.getPublic(true, 'hex'), 'hex');
 
