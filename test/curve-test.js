@@ -69,9 +69,9 @@ describe('Curve', function() {
 
     var k = new bn('1234567890123456789012345678901234', 16);
     var split = curve._endoSplit(k);
-    assert.equal(
-      split.k1.add(split.k2.mul(curve.endo.lambda)).mod(curve.n).toString(16),
-      k.toString(16));
+
+    var testK = split.k1.add(split.k2.mul(curve.endo.lambda)).umod(curve.n);
+    assert.equal(testK.toString(16), k.toString(16));
   });
 
   it('should compute this problematic secp256k1 multiplication', function() {
