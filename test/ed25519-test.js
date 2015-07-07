@@ -2,8 +2,6 @@
 
 var assert = require('assert');
 var fs = require('fs');
-var bn = require('bn.js');
-var hash = require('hash.js');
 var elliptic = require('../');
 var utils = elliptic.utils;
 var toArray = elliptic.utils.toArray;
@@ -52,7 +50,7 @@ describe('sign.input ed25519 test vectors', function() {
        lines = f.toString().split('\n');
        assert.equal(lines.length, expectedTests + 1 /*blank line*/);
        done();
-    })
+    });
   });
 
   function testFactory(i) {
@@ -74,18 +72,18 @@ describe('sign.input ed25519 test vectors', function() {
 
       var forged = msg.length === 0 ? [0x78] /*ord('x')*/:
                    msg.slice(0, msg.length-1).concat(
-                        (msg[(msg.length-1)] + 1) % 256)
+                        (msg[(msg.length-1)] + 1) % 256);
 
       assert.equal(msg.length || 1, forged.length);
       assert(!key.verify(forged, sig));
-    })
+    });
   }
   for (var i = 0; i < Math.min(expectedTests, MAX_PROGRAMMATIC); i++)
     testFactory(i);
 });
 
 describe('EDDSA(\'ed25519\')', function() {
-  var ed25519
+  var ed25519;
 
   before(function() {
     ed25519 = new eddsa('ed25519');
@@ -97,13 +95,13 @@ describe('EDDSA(\'ed25519\')', function() {
 
   it('can sign/verify messages', function() {
     var secret = toArray(new Array(65).join('0'), 'hex');
-    assert(secret.length == 32);
+    assert(secret.length === 32);
     var msg = [0xB, 0xE, 0xE, 0xF];
     var key = ed25519.keyFromSecret(secret);
     var sig = key.sign(msg).toHex();
 
-    var R = "8F1B9A7FDB22BCD2C15D4695B1CE2B063CBFAEC9B00BE360427BAC9533943F6C";
-    var S = "5F0B380FD7F2E43B70AB2FA29F6C6E3FFC1012710E174786814012324BF19B0C";
+    var R = '8F1B9A7FDB22BCD2C15D4695B1CE2B063CBFAEC9B00BE360427BAC9533943F6C';
+    var S = '5F0B380FD7F2E43B70AB2FA29F6C6E3FFC1012710E174786814012324BF19B0C';
 
     assert.equal(sig.slice(0, 64), R);
     assert.equal(sig.slice(64), S);
