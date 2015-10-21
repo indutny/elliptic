@@ -200,29 +200,38 @@ describe('ECDSA', function() {
     test({
       name: 'ECDSA, 384 Bits (Prime Field)',
       curve: elliptic.curves.p384,
-      key: '6b9d3dad2e1b8c1c05b19875b6659f4de23c3b667bf297ba9aa47740787137d896d5724e4c70a825f872c9ea60d2edf5',
+      key: '6b9d3dad2e1b8c1c05b19875b6659f4de23c3b667bf297ba9aa4774078713' +
+           '7d896d5724e4c70a825f872c9ea60d2edf5',
       pub: {
-        x: 'ec3a4e415b4e19a4568618029f427fa5da9a8bc4ae92e02e06aae5286b300c64def8f0ea9055866064a254515480bc13',
-        y: '8015d9b72d7d57244ea8ef9ac0c621896708a59367f9dfb9f54ca84b3f1c9db1288b231c3ae0d4fe7344fd2533264720'
+        x: 'ec3a4e415b4e19a4568618029f427fa5da9a8bc4ae92e02e06aae5286b30' +
+           '0c64def8f0ea9055866064a254515480bc13',
+        y: '8015d9b72d7d57244ea8ef9ac0c621896708a59367f9dfb9f54ca84b3f' +
+           '1c9db1288b231c3ae0d4fe7344fd2533264720'
       },
       cases: [
         {
           message: 'sample',
           hash: hash.sha224,
-          r: '42356e76b55a6d9b4631c865445dbe54e056d3b3431766d0509244793c3f9366450f76ee3de43f5a125333a6be060122',
-          s: '9da0c81787064021e78df658f2fbb0b042bf304665db721f077a4298b095e4834c082c03d83028efbf93a3c23940ca8d'
+          r: '42356e76b55a6d9b4631c865445dbe54e056d3b3431766d05092447' +
+             '93c3f9366450f76ee3de43f5a125333a6be060122',
+          s: '9da0c81787064021e78df658f2fbb0b042bf304665db721f077a429' +
+             '8b095e4834c082c03d83028efbf93a3c23940ca8d'
         },
         {
           message: 'sample',
           hash: hash.sha384,
-          r: '94edbb92a5ecb8aad4736e56c691916b3f88140666ce9fa73d64c4ea95ad133c81a648152e44acf96e36dd1e80fabe46',
-          s: '99ef4aeb15f178cea1fe40db2603138f130e740a19624526203b6351d0a3a94fa329c145786e679e7b82c71a38628ac8'
+          r: '94edbb92a5ecb8aad4736e56c691916b3f88140666ce9fa73d6' +
+             '4c4ea95ad133c81a648152e44acf96e36dd1e80fabe46',
+          s: '99ef4aeb15f178cea1fe40db2603138f130e740a19624526203b' +
+             '6351d0a3a94fa329c145786e679e7b82c71a38628ac8'
         },
         {
           message: 'test',
           hash: hash.sha384,
-          r: '8203b63d3c853e8d77227fb377bcf7b7b772e97892a80f36ab775d509d7a5feb0542a7f0812998da8f1dd3ca3cf023db',
-          s: 'ddd0760448d42d8a43af45af836fce4de8be06b485e9b61b827c2f13173923e06a739f040649a667bf3b828246baa5a5'
+          r: '8203b63d3c853e8d77227fb377bcf7b7b772e97892a80f36a' +
+             'b775d509d7a5feb0542a7f0812998da8f1dd3ca3cf023db',
+          s: 'ddd0760448d42d8a43af45af836fce4de8be06b485e9b61b827c2f13' +
+             '173923e06a739f040649a667bf3b828246baa5a5'
         }
       ],
     });
@@ -230,29 +239,46 @@ describe('ECDSA', function() {
     test({
       name: 'ECDSA, 521 Bits (Prime Field)',
       curve: elliptic.curves.p521,
-      key: '0fad06daa62ba3b25d2fb40133da757205de67f5bb0018fee8c86e1b68c7e75caa896eb32f1f47c70855836a6d16fcc1466f6d8fbec67db89ec0c08b0e996b83538',
+      key: '0fad06daa62ba3b25d2fb40133da757205de67f5bb0018fee8c86e1b68c7e75' +
+           'caa896eb32f1f47c70855836a6d16fcc1466f6d8fbec67db89ec0c08b0e996b' +
+           '83538',
       pub: {
-        x: '1894550d0785932e00eaa23b694f213f8c3121f86dc97a04e5a7167db4e5bcd371123d46e45db6b5d5370a7f20fb633155d38ffa16d2bd761dcac474b9a2f5023a4',
-        y: '0493101c962cd4d2fddf782285e64584139c2f91b47f87ff82354d6630f746a28a0db25741b5b34a828008b22acc23f924faafbd4d33f81ea66956dfeaa2bfdfcf5'
+        x: '1894550d0785932e00eaa23b694f213f8c3121f86dc97a04e5a7167db4e5bcd3' +
+           '71123d46e45db6b5d5370a7f20fb633155d38ffa16d2bd761dcac474b9a2f502' +
+           '3a4',
+        y: '0493101c962cd4d2fddf782285e64584139c2f91b47f87ff82354d6630f746a2' +
+           '8a0db25741b5b34a828008b22acc23f924faafbd4d33f81ea66956dfeaa2bfdfcf5'
       },
       cases: [
         {
           message: 'sample',
           hash: hash.sha384,
-          r: '1ea842a0e17d2de4f92c15315c63ddf72685c18195c2bb95e572b9c5136ca4b4b576ad712a52be9730627d16054ba40cc0b8d3ff035b12ae75168397f5d50c67451',
-          s: '1f21a3cee066e1961025fb048bd5fe2b7924d0cd797babe0a83b66f1e35eeaf5fde143fa85dc394a7dee766523393784484bdf3e00114a1c857cde1aa203db65d61'
+          r: '1ea842a0e17d2de4f92c15315c63ddf72685c18195c2bb95e572b9c5136ca4' +
+             'b4b576ad712a52be9730627d16054ba40cc0b8d3ff035b12ae75168397f5' +
+             'd50c67451',
+          s: '1f21a3cee066e1961025fb048bd5fe2b7924d0cd797babe0a83b66f1e35ee' +
+             'af5fde143fa85dc394a7dee766523393784484bdf3e00114a1c857cde1aa2' +
+             '03db65d61'
         },
         {
           message: 'sample',
           hash: hash.sha512,
-          r: '0c328fafcbd79dd77850370c46325d987cb525569fb63c5d3bc53950e6d4c5f174e25a1ee9017b5d450606add152b534931d7d4e8455cc91f9b15bf05ec36e377fa',
-          s: '0617cce7cf5064806c467f678d3b4080d6f1cc50af26ca209417308281b68af282623eaa63e5b5c0723d8b8c37ff0777b1a20f8ccb1dccc43997f1ee0e44da4a67a'
+          r: '0c328fafcbd79dd77850370c46325d987cb525569fb63c5d3bc53950e6d4c5' +
+             'f174e25a1ee9017b5d450606add152b534931d7d4e8455cc91f9b15bf05ec3' +
+             '6e377fa',
+          s: '0617cce7cf5064806c467f678d3b4080d6f1cc50af26ca209417308281b68' +
+             'af282623eaa63e5b5c0723d8b8c37ff0777b1a20f8ccb1dccc43997f1ee0e44' +
+             'da4a67a'
         },
         {
           message: 'test',
           hash: hash.sha512,
-          r: '13e99020abf5cee7525d16b69b229652ab6bdf2affcaef38773b4b7d08725f10cdb93482fdcc54edcee91eca4166b2a7c6265ef0ce2bd7051b7cef945babd47ee6d',
-          s: '1fbd0013c674aa79cb39849527916ce301c66ea7ce8b80682786ad60f98f7e78a19ca69eff5c57400e3b3a0ad66ce0978214d13baf4e9ac60752f7b155e2de4dce3'
+          r: '13e99020abf5cee7525d16b69b229652ab6bdf2affcaef38773b4b7d087' +
+             '25f10cdb93482fdcc54edcee91eca4166b2a7c6265ef0ce2bd7051b7cef945' +
+             'babd47ee6d',
+          s: '1fbd0013c674aa79cb39849527916ce301c66ea7ce8b80682786ad60f98' +
+             'f7e78a19ca69eff5c57400e3b3a0ad66ce0978214d13baf4e9ac60752f7b15' +
+             '5e2de4dce3'
         }
       ],
     });
