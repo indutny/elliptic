@@ -263,12 +263,12 @@ describe('ECDSA', function() {
         {
           message: 'sample',
           hash: hash.sha512,
-          r: '0c328fafcbd79dd77850370c46325d987cb525569fb63c5d3bc53950e6d4c5' +
-             'f174e25a1ee9017b5d450606add152b534931d7d4e8455cc91f9b15bf05ec3' +
-             '6e377fa',
-          s: '0617cce7cf5064806c467f678d3b4080d6f1cc50af26ca209417308281b68' +
-             'af282623eaa63e5b5c0723d8b8c37ff0777b1a20f8ccb1dccc43997f1ee0e44' +
-             'da4a67a'
+          r: 'c328fafcbd79dd77850370c46325d987cb525569fb63c5d3bc53950e6d4c5f1' +
+             '74e25a1ee9017b5d450606add152b534931d7d4e8455cc91f9b15bf05ec36e37' +
+             '7fa',
+          s: '617cce7cf5064806c467f678d3b4080d6f1cc50af26ca209417308281b68af2' +
+             '82623eaa63e5b5c0723d8b8c37ff0777b1a20f8ccb1dccc43997f1ee0e44da4a' +
+             '67a'
         },
         {
           message: 'test',
