@@ -5,6 +5,7 @@ var hash = require('hash.js');
 describe('ECDSA', function() {
   function test(name) {
     it('should work with ' + name + ' curve', function() {
+      this.timeout(5000);
       var curve = elliptic.curves[name];
       assert(curve);
 
@@ -16,11 +17,16 @@ describe('ECDSA', function() {
         ]
       });
       var msg = 'deadbeef';
-
+      var keylen = 64;
+      if (name === 'p384') {
+        keylen = 96;
+      } else if (name === 'p521') {
+        keylen = 132
+      }
       // Get keys out of pair
       assert(keys.getPublic().x && keys.getPublic().y);
       assert(keys.getPrivate().length > 0);
-      assert.equal(keys.getPrivate('hex').length, 64);
+      assert.equal(keys.getPrivate('hex').length, keylen);
       assert(keys.getPublic('hex').length > 0);
       assert(keys.getPrivate('hex').length > 0);
       assert(keys.validate().result);
@@ -40,7 +46,7 @@ describe('ECDSA', function() {
 
       // key.sign(msg, options)
       var sign = keys.sign('hello', { canonical: true });
-      assert.notEqual(sign.toDER('hex'), keys.sign('hello').toDER('hex'));
+      assert(sign.s.cmp(keys.ec.nh) <= 0);
 
       // Load public key from compact hex
       var keys = ecdsa.keyFromPublic(keys.getPublic(true, 'hex'), 'hex');
@@ -66,6 +72,9 @@ describe('ECDSA', function() {
   }
   test('secp256k1');
   test('ed25519');
+  test('p256');
+  test('p384');
+  test('p521');
 
   describe('RFC6979 vector', function() {
     function test(opt) {
