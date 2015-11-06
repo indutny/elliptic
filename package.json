@@ -3,6 +3,9 @@
   "version": "6.0.1",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
+  "files": [
+    "lib"
+  ],
   "scripts": {
     "test": "make lint && istanbul test _mocha --reporter=spec test/*-test.js",
     "coveralls": "cat ./coverage/lcov.info | coveralls"
