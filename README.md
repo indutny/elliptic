@@ -96,6 +96,8 @@ Following curve 'presets' are embedded into the library:
 * `p192`
 * `p224`
 * `p256`
+* `p384`
+* `p521`
 * `curve25519`
 * `ed25519`
 
