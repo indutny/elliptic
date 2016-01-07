@@ -68,11 +68,14 @@ console.log(key.verify(msg, derSign));
 // Public key as '04 + x + y'
 var pub = '04bb1fa3...';
 
-// Signature MUST be either hex-string, DER-encoded buffer or an object with two properties (r and s), which should be hex strings
+// Signature MUST be either:
+// 1) hex-string of DER-encoded signature; or
+// 2) DER-encoded signature as buffer; or
+// 3) object with two hex-string properties (r and s)
 
-var signature = 'b102ac...'; // hex-string
-var signature = new Buffer('...'); // DER-encoded buffer
-var signature = { r: 'b1fc...', s: '9c42...' }; // { r, s } object
+var signature = 'b102ac...'; // case 1
+var signature = new Buffer('...'); // case 2
+var signature = { r: 'b1fc...', s: '9c42...' }; // case 3
 
 // Import public key
 var key = ec.keyFromPublic(pub, 'hex');
