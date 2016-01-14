@@ -1,5 +1,6 @@
 var assert = require('assert');
 var elliptic = require('../');
+var BN = require('bn.js');
 var hash = require('hash.js');
 
 describe('ECDSA', function() {
@@ -47,6 +48,15 @@ describe('ECDSA', function() {
       // key.sign(msg, options)
       var sign = keys.sign('hello', { canonical: true });
       assert(sign.s.cmp(keys.ec.nh) <= 0);
+
+      // Custom K
+      var sign = keys.sign('ohai', {
+        k: function(iter) {
+          assert(iter >= 0);
+          return new BN(1358);
+        }
+      });
+      assert(ecdsa.verify(msg, signature, keys), 'custom-k verify');
 
       // Load public key from compact hex
       var keys = ecdsa.keyFromPublic(keys.getPublic(true, 'hex'), 'hex');
