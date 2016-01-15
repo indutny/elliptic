@@ -1,7 +1,7 @@
 'use strict';
 
 var assert = require('assert');
-var bn = require('bn.js');
+var BN = require('bn.js');
 var elliptic = require('../');
 
 describe('Curve', function() {
@@ -55,7 +55,7 @@ describe('Curve', function() {
     assert(p.validate());
     assert(p.dbl().validate());
     assert(p.toJ().dbl().toP().validate());
-    assert(p.mul(new bn('79be667e f9dcbbac 55a06295 ce870b07', 16)).validate());
+    assert(p.mul(new BN('79be667e f9dcbbac 55a06295 ce870b07', 16)).validate());
 
     var j = p.toJ();
     assert(j.trpl().eq(j.dbl().add(j)));
@@ -69,7 +69,7 @@ describe('Curve', function() {
       curve.endo.lambda.toString(16),
       '5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72');
 
-    var k = new bn('1234567890123456789012345678901234', 16);
+    var k = new BN('1234567890123456789012345678901234', 16);
     var split = curve._endoSplit(k);
 
     var testK = split.k1.add(split.k2.mul(curve.endo.lambda)).umod(curve.n);
@@ -82,7 +82,7 @@ describe('Curve', function() {
     assert(g1.precomputed);
     var g2 = curve.point(g1.getX(), g1.getY()); // not precomputed g
     assert(!g2.precomputed);
-    var a = new bn(
+    var a = new BN(
         '6d1229a6b24c2e775c062870ad26bc261051e0198c67203167273c7c62538846', 16);
     var p1 = g1.mul(a);
     var p2 = g2.mul(a);
@@ -96,7 +96,7 @@ describe('Curve', function() {
     var g2 = curve.point(g1.getX(), g1.getY()); // not precomputed g
     assert(!g2.precomputed);
 
-    var a = new bn(
+    var a = new BN(
         '6d1229a6b24c2e775c062870ad26bc26' +
             '1051e0198c67203167273c7c6253884612345678',
         16);
@@ -107,9 +107,9 @@ describe('Curve', function() {
 
   it('should not fail on secp256k1 regression', function() {
     var curve = elliptic.curves.secp256k1.curve;
-    var k1 = new bn(
+    var k1 = new BN(
         '32efeba414cd0c830aed727749e816a01c471831536fd2fce28c56b54f5a3bb1', 16);
-    var k2 = new bn(
+    var k2 = new BN(
         '5f2e49b5d64e53f9811545434706cde4de528af97bfd49fde1f6cf792ee37a8c', 16);
 
     var p1 = curve.g.mul(k1);
@@ -240,7 +240,7 @@ describe('Point codec', function () {
 
   it('should be able to encode/decode a mont curve point', makeMontTest({
     coordinates: {
-      // curve25519.curve.g.mul(new bn('6')).getX().toString(16, 2)
+      // curve25519.curve.g.mul(new BN('6')).getX().toString(16, 2)
       x: '26954ccdc99ebf34f8f1dde5e6bb080685fec73640494c28f9fe0bfa8c794531',
       z: '1'
     },
