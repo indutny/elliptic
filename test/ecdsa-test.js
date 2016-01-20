@@ -74,6 +74,13 @@ describe('ECDSA', function() {
         assert(ecdsa.verify(msg, sign, keys), 'custom-k verify');
       });
 
+      it('should have another signature with pers', function () {
+        var sign1 = keys.sign(msg);
+        var sign2 = keys.sign(msg, {pers: '1234', persEnc: 'hex'});
+        assert.notEqual(sign1.r.toArray().concat(sign1.s.toArray()),
+                        sign2.r.toArray().concat(sign2.s.toArray()));
+      });
+
       it('should load public key from compact hex value', function() {
         var pub = keys.getPublic(true, 'hex');
         var copy = ecdsa.keyFromPublic(pub, 'hex');
