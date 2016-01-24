@@ -367,4 +367,19 @@ describe('ECDSA', function() {
     var r =  ec.recoverPubKey(msg, signature, recid);
     assert(key.getPublic().eq(r), 'the keys should match');
   });
+
+  it('should fail to recover key when no quadratic residue available',
+     function() {
+    var ec = new elliptic.ec('secp256k1');
+
+    var message =
+        'f75c6b18a72fabc0f0b888c3da58e004f0af1fe14f7ca5d8c897fe164925d5e9';
+
+    assert.throws(function() {
+      ecdsa.recoverPubKey(message, {
+        r: 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140',
+        s: '8887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a3',
+      }, 0);
+    });
+  });
 });
