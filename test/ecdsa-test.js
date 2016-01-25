@@ -1,5 +1,6 @@
 var assert = require('assert');
 var elliptic = require('../');
+var Signature = require('../lib/elliptic/ec/signature')
 var BN = require('bn.js');
 var hash = require('hash.js');
 
@@ -380,6 +381,18 @@ describe('ECDSA', function() {
         r: 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140',
         s: '8887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a3',
       }, 0);
+    });
+  });
+
+  describe('Signature', function () {
+    it('recoveryParam is 0', function () {
+      var sig = new Signature({r: '00', s: '00', recoveryParam: 0});
+      assert.equal(sig.recoveryParam, 0);
+    });
+
+    it('recoveryParam is 1', function () {
+      var sig = new Signature({r: '00', s: '00', recoveryParam: 1});
+      assert.equal(sig.recoveryParam, 1);
     });
   });
 });
