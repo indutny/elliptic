@@ -95,7 +95,7 @@ add('sign', {
   },
   secp256k1: function() {
     secp256k1.sign(k4priv, m4);
-  },
+  }
 });
 
 var os1 = crypto.createSign('RSA-SHA256').update(str).sign(ok);
@@ -118,7 +118,7 @@ add('verify', {
   },
   secp256k1: function() {
     secp256k1.verify(k4pub, m4, s4);
-  },
+  }
 });
 
 add('gen', {

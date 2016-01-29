@@ -15,7 +15,8 @@ var MAX_PROGRAMMATIC = process.env.CI ? Infinity : 50;
 
 describe('ed25519 derivations', function() {
   var expectedTests = 256;
-  var ed25519, derivations;
+  var ed25519;
+  var derivations;
 
   before(function() {
     ed25519 = new eddsa('ed25519');
@@ -42,14 +43,15 @@ describe('ed25519 derivations', function() {
 
 describe('sign.input ed25519 test vectors', function() {
   var expectedTests = 1024;
-  var ed25519, lines;
+  var ed25519;
+  var lines;
 
   before(function(done) {
     ed25519 = new eddsa('ed25519');
     fs.readFile(__dirname + '/fixtures/sign.input', function(err, f) {
-       lines = f.toString().split('\n');
-       assert.equal(lines.length, expectedTests + 1 /*blank line*/);
-       done();
+      lines = f.toString().split('\n');
+      assert.equal(lines.length, expectedTests + 1 /*blank line*/);
+      done();
     });
   });
 
@@ -70,9 +72,9 @@ describe('sign.input ed25519 test vectors', function() {
       assert.equal(sigS, split[3].slice(64, 128));
       assert(key.verify(msg, sig));
 
-      var forged = msg.length === 0 ? [0x78] /*ord('x')*/:
-                   msg.slice(0, msg.length-1).concat(
-                        (msg[(msg.length-1)] + 1) % 256);
+      var forged = msg.length === 0 ? [ 0x78 ] /*ord('x')*/:
+                   msg.slice(0, msg.length - 1).concat(
+                        (msg[(msg.length - 1)] + 1) % 256);
 
       assert.equal(msg.length || 1, forged.length);
       assert(!key.verify(forged, sig));
@@ -96,7 +98,7 @@ describe('EDDSA(\'ed25519\')', function() {
   it('can sign/verify messages', function() {
     var secret = toArray(new Array(65).join('0'), 'hex');
     assert(secret.length === 32);
-    var msg = [0xB, 0xE, 0xE, 0xF];
+    var msg = [ 0xB, 0xE, 0xE, 0xF ];
     var key = ed25519.keyFromSecret(secret);
     var sig = key.sign(msg).toHex();
 
