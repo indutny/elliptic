@@ -77,7 +77,7 @@ describe('ECDSA', function() {
 
       it('should have another signature with pers', function () {
         var sign1 = keys.sign(msg);
-        var sign2 = keys.sign(msg, {pers: '1234', persEnc: 'hex'});
+        var sign2 = keys.sign(msg, { pers: '1234', persEnc: 'hex' });
         assert.notEqual(sign1.r.toArray().concat(sign1.s.toArray()),
                         sign2.r.toArray().concat(sign2.s.toArray()));
       });
@@ -183,7 +183,7 @@ describe('ECDSA', function() {
           r: '3a718bd8b4926c3b52ee6bbe67ef79b18cb6eb62b1ad97ae',
           s: '5662e6848a4a19b1f1ae2f72acd4b8bbe50f1eac65d9124f'
         }
-      ],
+      ]
     });
 
     test({
@@ -219,7 +219,7 @@ describe('ECDSA', function() {
           r: 'ad04dde87b84747a243a631ea47a1ba6d1faa059149ad2440de6fba6',
           s: '178d49b1ae90e3d8b629be3db5683915f4e8c99fdf6e666cf37adcfd'
         }
-      ],
+      ]
     });
 
     test({
@@ -255,7 +255,7 @@ describe('ECDSA', function() {
           r: 'f1abb023518351cd71d881567b1ea663ed3efcf6c5132b354f28d3b0b7d38367',
           s: '19f4113742a2b14bd25926b49c649155f267e60d3814b4c0cc84250e46f0083'
         }
-      ],
+      ]
     });
 
     test({
@@ -294,7 +294,7 @@ describe('ECDSA', function() {
           s: 'ddd0760448d42d8a43af45af836fce4de8be06b485e9b61b827c2f13' +
              '173923e06a739f040649a667bf3b828246baa5a5'
         }
-      ],
+      ]
     });
 
     test({
@@ -325,11 +325,11 @@ describe('ECDSA', function() {
           message: 'sample',
           hash: hash.sha512,
           r: 'c328fafcbd79dd77850370c46325d987cb525569fb63c5d3bc53950e6d4c5f1' +
-             '74e25a1ee9017b5d450606add152b534931d7d4e8455cc91f9b15bf05ec36e37' +
-             '7fa',
+             '74e25a1ee9017b5d450606add152b534931d7d4e8455cc91f9b15bf05ec36e3' +
+             '77fa',
           s: '617cce7cf5064806c467f678d3b4080d6f1cc50af26ca209417308281b68af2' +
-             '82623eaa63e5b5c0723d8b8c37ff0777b1a20f8ccb1dccc43997f1ee0e44da4a' +
-             '67a'
+             '82623eaa63e5b5c0723d8b8c37ff0777b1a20f8ccb1dccc43997f1ee0e44da4' +
+             'a67a'
         },
         {
           message: 'test',
@@ -341,7 +341,7 @@ describe('ECDSA', function() {
              'f7e78a19ca69eff5c57400e3b3a0ad66ce0978214d13baf4e9ac60752f7b15' +
              '5e2de4dce3'
         }
-      ],
+      ]
     });
   });
 
@@ -359,7 +359,7 @@ describe('ECDSA', function() {
       '6160edb2b218b7f1394b9ca8eb65a72831032a1f2f3dc2d99291c2f7950ed887');
   });
 
-  it('should recover the public key from a signature', function(){
+  it('should recover the public key from a signature', function() {
     var ec = new elliptic.ec('secp256k1');
     var key = ec.genKeyPair();
     var msg = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ];
@@ -379,19 +379,19 @@ describe('ECDSA', function() {
     assert.throws(function() {
       ecdsa.recoverPubKey(message, {
         r: 'fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140',
-        s: '8887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a3',
+        s: '8887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a3'
       }, 0);
     });
   });
 
   describe('Signature', function () {
     it('recoveryParam is 0', function () {
-      var sig = new Signature({r: '00', s: '00', recoveryParam: 0});
+      var sig = new Signature({ r: '00', s: '00', recoveryParam: 0 });
       assert.equal(sig.recoveryParam, 0);
     });
 
     it('recoveryParam is 1', function () {
-      var sig = new Signature({r: '00', s: '00', recoveryParam: 1});
+      var sig = new Signature({ r: '00', s: '00', recoveryParam: 1 });
       assert.equal(sig.recoveryParam, 1);
     });
   });

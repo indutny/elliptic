@@ -29,7 +29,7 @@ describe('Hmac_DRBG', function() {
         pers: null,
         size: 32,
         res: 'ed5d61ecf0ef38258e62f03bbb49f19f2cd07ba5145a840d83b134d5963b3633'
-      },
+      }
     ];
     for (var i = 0; i < test.length; i++)
       assert.equal(doDrbg(test[i]), test[i].res);
