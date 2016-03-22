@@ -11,12 +11,25 @@ node_js:
 env:
   global:
     secure: ewqsRnX7z3+g6q+mM6peRPhuTlTlkJIRmVG/Ya9AcDXEb7as49KDTdqfMcOu7+FxF50ehqla+TRRCLRPOcVkWqs72OVUXEsjRASp9jQwpQGl+g/vZhyTMwlM2ENEkyiFQtobI1hYKgVW1ogftkc6vm7ywvoyTrFp/leVJBrTuHk=
+    - SAUCE_USERNAME=elliptic
+    - SAUCE_ACCESS_KEY=1eef61cb-4400-4126-ba34-a806899b1247
   matrix:
-    - TEST_SUITE=unit
+    - TEST_SUITE='npm run unit'
 matrix:
   include:
     - node_js: "4"
-      env: TEST_SUITE=lint
+      env: TEST_SUITE='npm run lint'
     - node_js: "4"
-      env: TEST_SUITE=coveralls
-script: npm run $TEST_SUITE
+      env: TEST_SUITE='grunt coveralls'
+    - node_js: "4"
+      env: TEST_SUITE='grunt saucelabs'
+  allow_failures:
+    - env: TEST_SUITE='grunt saucelabs'
+fast_finish: true
+cache:
+  directories:
+    - node_modules
+before_script:
+  - npm install -g grunt-cli
+script:
+  - $TEST_SUITE
