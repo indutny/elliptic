@@ -11,12 +11,24 @@ node_js:
 env:
   global:
     secure: ewqsRnX7z3+g6q+mM6peRPhuTlTlkJIRmVG/Ya9AcDXEb7as49KDTdqfMcOu7+FxF50ehqla+TRRCLRPOcVkWqs72OVUXEsjRASp9jQwpQGl+g/vZhyTMwlM2ENEkyiFQtobI1hYKgVW1ogftkc6vm7ywvoyTrFp/leVJBrTuHk=
+    secure: d4Yj0rUDUSFrUKU9vuZZc3p4aiQmKwZVWigVhybU2RfZHpxoakTYd3z7Ys23z+yQZt+BWcul1L3H5DwvACGTwyltwVmHzTWSBtunHax41TN9ZwOY4y37qWNfzEkz72URPL65ujd8ozkyxsiysAq+BE9+5gl9OZxfzExXNfRD3e4
   matrix:
-    - TEST_SUITE=unit
+    - TEST_SUITE='npm run unit'
 matrix:
   include:
     - node_js: "4"
-      env: TEST_SUITE=lint
+      env: TEST_SUITE='npm run lint'
     - node_js: "4"
-      env: TEST_SUITE=coveralls
-script: npm run $TEST_SUITE
+      env: TEST_SUITE='grunt coveralls'
+    - node_js: "4"
+      env: TEST_SUITE='grunt saucelabs'
+  allow_failures:
+    - env: TEST_SUITE='grunt saucelabs'
+fast_finish: true
+cache:
+  directories:
+    - node_modules
+before_script:
+  - npm install -g grunt-cli
+script:
+  - $TEST_SUITE
