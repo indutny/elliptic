@@ -1,7 +1,6 @@
 'use strict';
 
 var assert = require('assert');
-var fs = require('fs');
 var elliptic = require('../');
 var utils = elliptic.utils;
 var toArray = elliptic.utils.toArray;
@@ -48,7 +47,7 @@ describe('sign.input ed25519 test vectors', function() {
 
   before(function(done) {
     ed25519 = new eddsa('ed25519');
-    fs.readFile(__dirname + '/fixtures/sign.input', function(err, f) {
+    require('fs').readFile(__dirname + '/fixtures/sign.input', function(err, f) {
       lines = f.toString().split('\n');
       assert.equal(lines.length, expectedTests + 1 /*blank line*/);
       done();
