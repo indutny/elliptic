@@ -11,7 +11,8 @@ node_js:
 env:
   global:
     - secure: ewqsRnX7z3+g6q+mM6peRPhuTlTlkJIRmVG/Ya9AcDXEb7as49KDTdqfMcOu7+FxF50ehqla+TRRCLRPOcVkWqs72OVUXEsjRASp9jQwpQGl+g/vZhyTMwlM2ENEkyiFQtobI1hYKgVW1ogftkc6vm7ywvoyTrFp/leVJBrTuHk=
-    - secure: pKsLiCxCv/r10LzcQ2lmXLQMVfE5Lpqpn79qF9sZ0htsoWYuW4WbjKJSLQi7RFAhotdYZCJCnanZVMcS480hjpO5tNivDPBa8lH3teYYyGIMQVYf2YvX/HmEpRKVCBuzCvBlLL7W1bhaH8Dh/aIxkuAwlOveihpKRmnQkiawDGU=
+    - secure: UcurJwykdbpUrAsrMox4BfiSGOWDIcI8ytBdxgK2vOC2biZJmkFXG4WfB6X2PwNvK4hx0z2s+VhxNVQRwtyl9mqyeAoAWjTpDg+NOoBgTu6Bacsobg29m65tD4x4Qc6iSmylRnfdb04Iob4rsnNNLZbIbERv3j3PFJMENUD3acQ=
+    - secure: S8vAesx9V9o0/cJRmENJ76JrzSPLo8mtKAfDVHgcVG7Okfl7ANs+0cW1BtjZjBR63uQKJSmQEYC6N9eQlnNhCjeM7KXtFEbtD76OxvAABj4Sr9pIY06KUYLvBaGdYNmyT0WMIAaRN8SzY2uZEUaxMHmiEd1yOw6qQYBMCjbx0xg=
   matrix:
     - TEST_SUITE='npm run unit'
 matrix:
