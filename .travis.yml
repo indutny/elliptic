@@ -11,7 +11,7 @@ node_js:
 env:
   global:
     - secure: ewqsRnX7z3+g6q+mM6peRPhuTlTlkJIRmVG/Ya9AcDXEb7as49KDTdqfMcOu7+FxF50ehqla+TRRCLRPOcVkWqs72OVUXEsjRASp9jQwpQGl+g/vZhyTMwlM2ENEkyiFQtobI1hYKgVW1ogftkc6vm7ywvoyTrFp/leVJBrTuHk=
-    - secure: toafrATgXpnFcnvIeQvMK3gg0F5dxd+TI07RsukfnxGBCpTUJW/WnIS5y/2dvhtqWqopc+omivWTCDqU4ghYT24SZ1mO2CW+zP1n1FifzV8dUVVBenu0kbLzwbEhSE2J0u+cr4CfpPFiN7+GU2vndb41yGm/CK2qwO8snr6UwCs=
+    - secure: pKsLiCxCv/r10LzcQ2lmXLQMVfE5Lpqpn79qF9sZ0htsoWYuW4WbjKJSLQi7RFAhotdYZCJCnanZVMcS480hjpO5tNivDPBa8lH3teYYyGIMQVYf2YvX/HmEpRKVCBuzCvBlLL7W1bhaH8Dh/aIxkuAwlOveihpKRmnQkiawDGU=
   matrix:
     - TEST_SUITE='npm run unit'
 matrix:
