@@ -8,7 +8,17 @@ module.exports = function(grunt) {
         options: {
           transform: ['brfs']
         }
-      }
+      },
+      dist: {
+        files: {
+          'dist/elliptic.js': [ 'lib/elliptic.js']
+        },
+        options: {
+          browserifyOptions:{
+            standalone: "elliptic"
+          }
+        }
+      },
     },
     connect: {
       server: {
@@ -149,9 +159,9 @@ module.exports = function(grunt) {
       },
     },
     uglify: {
-      scrypt: {
+      dist: {
         files: {
-          'elliptic.min.js' : [ 'elliptic.js' ]
+          'dist/elliptic.min.js' : [ 'dist/elliptic.js' ]
         }
       }
     }
@@ -173,8 +183,8 @@ module.exports = function(grunt) {
     });
   });
 
-  grunt.registerTask('build', ['uglify']);
-  grunt.registerTask('coverage', ['browserify', 'copy:test', 'mocha_istanbul:coverage']);
-  grunt.registerTask('coveralls', ['browserify', 'copy:test', 'mocha_istanbul:coveralls']);
-  grunt.registerTask('saucelabs', ['browserify', 'copy:test', 'connect', 'saucelabs-mocha']);
+  grunt.registerTask('build', ['browserify:dist', 'uglify']);
+  grunt.registerTask('coverage', ['browserify:unittests', 'copy:test', 'mocha_istanbul:coverage']);
+  grunt.registerTask('coveralls', ['browserify:unittests', 'copy:test', 'mocha_istanbul:coveralls']);
+  grunt.registerTask('saucelabs', ['browserify:unittests', 'copy:test', 'connect', 'saucelabs-mocha']);
 };
