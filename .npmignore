@@ -1,0 +1,7 @@
+dist/
+test/lib/
+node_modules/
+coverage/
+npm-debug.log
+1.js
+v8.log
