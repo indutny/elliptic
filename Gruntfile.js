@@ -12,6 +12,11 @@ module.exports = function(grunt) {
       dist: {
         files: {
           'dist/elliptic.js': [ 'lib/**/*.js' ]
+        },
+        options: {
+          browserifyOptions: {
+            standalone: 'elliptic'
+          }
         }
       }
     },
