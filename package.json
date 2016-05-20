@@ -11,7 +11,8 @@
     "jshint": "jscs benchmarks/*.js lib/*.js lib/**/*.js lib/**/**/*.js test/index.js",
     "lint": "npm run jscs && npm run jshint",
     "unit": "istanbul test _mocha --reporter=spec test/index.js",
-    "test": "npm run lint && npm run unit"
+    "test": "npm run lint && npm run unit",
+    "version": "grunt dist && git add dist/"
   },
   "repository": {
     "type": "git",
