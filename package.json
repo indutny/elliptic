@@ -1,6 +1,6 @@
 {
   "name": "elliptic",
-  "version": "6.2.3",
+  "version": "6.2.4",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "files": [
@@ -31,7 +31,7 @@
   },
   "homepage": "https://github.com/indutny/elliptic",
   "devDependencies": {
-    "brfs":  "^1.4.3",
+    "brfs": "^1.4.3",
     "coveralls": "^2.11.3",
     "grunt": "^0.4.5",
     "grunt-browserify": "^5.0.0",
