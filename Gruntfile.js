@@ -11,7 +11,7 @@ module.exports = function(grunt) {
       },
       dist: {
         files: {
-          'dist/elliptic.js': [ 'lib/**/*.js' ]
+          'dist/elliptic.js': [ 'lib/elliptic.js' ]
         },
         options: {
           browserifyOptions: {
