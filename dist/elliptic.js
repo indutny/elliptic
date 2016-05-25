@@ -8554,7 +8554,7 @@ if (typeof Object.create === 'function') {
 },{}],26:[function(require,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "6.2.5",
+  "version": "6.2.6",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "files": [
@@ -8607,5 +8607,5 @@ module.exports={
   }
 }
 
-},{}]},{},[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])(16)
+},{}]},{},[1])(1)
 });
