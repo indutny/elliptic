@@ -180,6 +180,7 @@ describe('Point codec', function () {
       // Decodes as expected
       assert(curve.decodePoint(definition.encoded, 'hex').eq(p));
       assert(curve.decodePoint(definition.compactEncoded, 'hex').eq(p));
+      assert(curve.decodePoint(definition.hybrid, 'hex').eq(p));
     };
   }
 
@@ -207,6 +208,10 @@ describe('Point codec', function () {
     encoded:
       '04' +
       '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798' +
+      '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8',
+    hybrid:
+      '06' +
+      '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798' +
       '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
   };
 
@@ -220,6 +225,10 @@ describe('Point codec', function () {
       'fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556',
     encoded:
       '04' +
+      'fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556' +
+      'ae12777aacfbb620f3be96017f45c560de80f0f6518fe4a03c870c36b075f297',
+    hybrid:
+      '07' +
       'fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556' +
       'ae12777aacfbb620f3be96017f45c560de80f0f6518fe4a03c870c36b075f297'
   };
