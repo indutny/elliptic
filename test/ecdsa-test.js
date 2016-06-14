@@ -345,6 +345,107 @@ describe('ECDSA', function() {
     });
   });
 
+  describe('Maxwell\'s trick', function() {
+    var p256 = elliptic.curves.p256;
+    assert(p256);
+    var p384 = elliptic.curves.p384;
+    assert(p384);
+
+    var msg =
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+
+    var vectors = [
+      {
+        curve: p256,
+        pub: '041548fc88953e06cd34d4b300804c5322cb48c24aaaa4d0' +
+             '7a541b0f0ccfeedeb0ae4991b90519ea405588bdf699f5e6' +
+             'd0c6b2d5217a5c16e8371062737aa1dae1',
+        message: msg,
+        sig: '3006020106020104',
+        result: true
+      },
+      {
+        curve: p256,
+        pub: '04ad8f60e4ec1ebdb6a260b559cb55b1e9d2c5ddd43a41a2' +
+             'd11b0741ef2567d84e166737664104ebbc337af3d861d352' +
+             '4cfbc761c12edae974a0759750c8324f9a',
+        message: msg,
+        sig: '3006020106020104',
+        result: true
+      },
+      {
+        curve: p256,
+        pub: '0445bd879143a64af5746e2e82aa65fd2ea07bba4e355940' +
+             '95a981b59984dacb219d59697387ac721b1f1eccf4b11f43' +
+             'ddc39e8367147abab3084142ed3ea170e4',
+        message: msg,
+        sig: '301502104319055358e8617b0c46353d039cdaae020104',
+        result: true
+      },
+      {
+        curve: p256,
+        pub: '040feb5df4cc78b35ec9c180cc0de5842f75f088b4845697' +
+             '8ffa98e716d94883e1e6500b2a1f6c1d9d493428d7ae7d9a' +
+             '8a560fff30a3d14aa160be0c5e7edcd887',
+        message: msg,
+        sig: '301502104319055358e8617b0c46353d039cdaae020104',
+        result: false
+      },
+      {
+        curve: p384,
+        pub: '0425e299eea9927b39fa92417705391bf17e8110b4615e9e' +
+             'b5da471b57be0c30e7d89dbdc3e5da4eae029b300344d385' +
+             '1548b59ed8be668813905105e673319d59d32f574e180568' +
+             '463c6186864888f6c0b67b304441f82aab031279e48f047c31',
+        message: msg,
+        sig: '3006020103020104',
+        result: true
+      },
+      {
+        curve: p384,
+        pub: '04a328f65c22307188b4af65779c1d2ec821c6748c6bd8dc' +
+             '0e6a008135f048f832df501f7f3f79966b03d5bef2f187ec' +
+             '34d85f6a934af465656fb4eea8dd9176ab80fbb4a27a649f' +
+             '526a7dfe616091b78d293552bc093dfde9b31cae69d51d3afb',
+        message: msg,
+        sig: '3006020103020104',
+        result: true
+      },
+      {
+        curve: p384,
+        pub: '04242e8585eaa7a28cc6062cab4c9c5fd536f46b17be1728' +
+             '288a2cda5951df4941aed1d712defda023d10aca1c5ee014' +
+             '43e8beacd821f7efa27847418ab95ce2c514b2b6b395ee73' +
+             '417c83dbcad631421f360d84d64658c98a62d685b220f5aad4',
+        message: msg,
+        sig: '301d0218389cb27e0bc8d21fa7e5f24cb74f58851313e696333ad68e020104',
+        result: true
+      },
+      {
+        curve: p384,
+        pub: '04cdf865dd743fe1c23757ec5e65fd5e4038b472ded2af26' +
+             '1e3d8343c595c8b69147df46379c7ca40e60e80170d34a11' +
+             '88dbb2b6f7d3934c23d2f78cfb0db3f3219959fad63c9b61' +
+             '2ef2f20d679777b84192ce86e781c14b1bbb77eacd6e0520e2',
+        message: msg,
+        sig: '301d0218389cb27e0bc8d21fa7e5f24cb74f58851313e696333ad68e020104',
+        result: false
+      }
+    ];
+
+    vectors.forEach(function(vector, i) {
+      it('should pass on vector#' + i, function() {
+        var ecdsa = new elliptic.ec(vector.curve);
+        var key = ecdsa.keyFromPublic(vector.pub, 'hex');
+        var msg = vector.message;
+        var sig = vector.sig;
+
+        var actual = ecdsa.verify(msg, sig, key);
+        assert.equal(actual, vector.result);
+      });
+    });
+  });
+
   it('should deterministically generate private key', function() {
     var curve = elliptic.curves.secp256k1;
     assert(curve);
