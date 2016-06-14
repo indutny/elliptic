@@ -3470,10 +3470,9 @@ function BaseCurve(type, conf) {
   // Generalized Greg Maxwell's trick
   var adjustCount = this.n && this.p.div(this.n);
   if (!adjustCount || adjustCount.cmpn(100) > 0) {
-    this._maxwellAdjust = 0;
     this.redN = null;
   } else {
-    this._maxwellAdjust = adjustCount.toNumber();
+    this._maxwellTrick = true;
     this.redN = this.n.toRed(this.red);
   }
 }
@@ -4230,8 +4229,13 @@ Point.prototype.eqXToP = function eqXToP(x) {
   if (this.x.cmp(rx) === 0)
     return true;
 
+  var xc = x.clone();
   var t = this.curve.redN.redMul(this.z);
-  for (var i = 1; i <= this.curve._maxwellAdjust; i++) {
+  for (;;) {
+    xc.iadd(this.curve.n);
+    if (xc.cmp(this.curve.p) >= 0)
+      return false;
+
     rx.redIAdd(t);
     if (this.x.cmp(rx) === 0)
       return true;
@@ -5348,8 +5352,13 @@ JPoint.prototype.eqXToP = function eqXToP(x) {
   if (this.x.cmp(rx) === 0)
     return true;
 
+  var xc = x.clone();
   var t = this.curve.redN.redMul(zs);
-  for (var i = 1; i <= this.curve._maxwellAdjust; i++) {
+  for (;;) {
+    xc.iadd(this.curve.n);
+    if (xc.cmp(this.curve.p) >= 0)
+      return false;
+
     rx.redIAdd(t);
     if (this.x.cmp(rx) === 0)
       return true;
@@ -5746,7 +5755,7 @@ EC.prototype.verify = function verify(msg, signature, key, enc) {
   var u1 = sinv.mul(msg).umod(this.n);
   var u2 = sinv.mul(r).umod(this.n);
 
-  if (this.curve._maxwellAdjust === 0) {
+  if (!this.curve._maxwellTrick) {
     var p = this.g.mulAdd(u1, key.getPublic(), u2);
     if (p.isInfinity())
       return false;
@@ -8637,7 +8646,7 @@ if (typeof Object.create === 'function') {
 },{}],26:[function(require,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "6.3.0",
+  "version": "6.3.1",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "files": [
