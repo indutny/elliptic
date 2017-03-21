@@ -68,20 +68,14 @@ console.log(key.verify(msgHash, derSign));
 // CHECK WITH NO PRIVATE KEY
 
 var pubPoint = key.getPublic();
-var x = pubPoint.x;
-var y = pubPoint.y;
-
-// The public key point has been put in a reducion context to make calculations
-// easier, but to export these values this must be undone first.
-if (x.red)
-  x = x.fromRed();
-if (y.red)
-  y = y.fromRed();
+var x = pubPoint.getX();
+var y = pubPoint.getY();
 
 // Public Key MUST be either:
 // 1) '04' + hex string of x + hex string of y; or
 // 2) object with two hex string properties (x and y); or
 // 3) object with two buffer properties (x and y)
+var pub = pubPoint.encode();                                      // case 1
 var pub = '04' + x.toString('hex') + y.toString('hex');           // case 1
 var pub = { x: x.toString('hex'), y: y.toString('hex') };         // case 2
 var pub = { x: x.toBuffer(), y: y.toBuffer() };                   // case 3
