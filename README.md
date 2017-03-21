@@ -67,20 +67,38 @@ console.log(key.verify(msgHash, derSign));
 
 // CHECK WITH NO PRIVATE KEY
 
-// Public key as '04 + x + y'
-var pub = '04bb1fa3...';
+var pubPoint = key.getPublic();
+var x = pubPoint.x;
+var y = pubPoint.y;
 
-// Signature MUST be either:
-// 1) hex-string of DER-encoded signature; or
-// 2) DER-encoded signature as buffer; or
-// 3) object with two hex-string properties (r and s)
+// The public key point has been put in a reducion context to make calculations
+// easier, but to export these values this must be undone first.
+if (x.red)
+  x = x.fromRed();
+if (y.red)
+  y = y.fromRed();
 
-var signature = 'b102ac...'; // case 1
-var signature = new Buffer('...'); // case 2
-var signature = { r: 'b1fc...', s: '9c42...' }; // case 3
+// Public Key MUST be either:
+// 1) '04' + hex string of x + hex string of y; or
+// 2) object with two hex string properties (x and y); or
+// 3) object with two buffer properties (x and y)
+var pub = '04' + x.toString('hex') + y.toString('hex');           // case 1
+var pub = { x: x.toString('hex'), y: y.toString('hex') };         // case 2
+var pub = { x: x.toBuffer(), y: y.toBuffer() };                   // case 3
+var pub = { x: x.toArrayLike(Buffer), y: y.toArrayLike(Buffer) }; // case 3
 
 // Import public key
 var key = ec.keyFromPublic(pub, 'hex');
+
+// Signature MUST be either:
+// 1) DER-encoded signature as hex-string; or
+// 2) DER-encoded signature as buffer; or
+// 3) object with two hex-string properties (r and s); or
+// 4) object with two buffer properties (r and s)
+
+var signature = '3046022100...'; // case 1
+var signature = new Buffer('...'); // case 2
+var signature = { r: 'b1fc...', s: '9c42...' }; // case 3
 
 // Verify signature
 console.log(key.verify(msgHash, signature));
