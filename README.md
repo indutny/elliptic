@@ -75,8 +75,7 @@ var y = pubPoint.getY();
 // 1) '04' + hex string of x + hex string of y; or
 // 2) object with two hex string properties (x and y); or
 // 3) object with two buffer properties (x and y)
-var pub = pubPoint.encode();                                      // case 1
-var pub = '04' + x.toString('hex') + y.toString('hex');           // case 1
+var pub = pubPoint.encode('hex');                                 // case 1
 var pub = { x: x.toString('hex'), y: y.toString('hex') };         // case 2
 var pub = { x: x.toBuffer(), y: y.toBuffer() };                   // case 3
 var pub = { x: x.toArrayLike(Buffer), y: y.toArrayLike(Buffer) }; // case 3
