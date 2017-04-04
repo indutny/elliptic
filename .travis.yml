@@ -8,6 +8,8 @@ node_js:
   - "0.12"
   - "4"
   - "5"
+  - "6"
+  - "7"
 env:
   global:
     - secure: ewqsRnX7z3+g6q+mM6peRPhuTlTlkJIRmVG/Ya9AcDXEb7as49KDTdqfMcOu7+FxF50ehqla+TRRCLRPOcVkWqs72OVUXEsjRASp9jQwpQGl+g/vZhyTMwlM2ENEkyiFQtobI1hYKgVW1ogftkc6vm7ywvoyTrFp/leVJBrTuHk=
@@ -33,3 +35,4 @@ before_script:
   - npm install -g grunt-cli
 script:
   - $TEST_SUITE
+  - if [[ $TRAVIS_NODE_VERSION == 6* ]]; then ./node_modules/.bin/build-jslib-ci; fi
