@@ -105,6 +105,18 @@ describe('Curve', function() {
     assert(p1.eq(p2));
   });
 
+  it('should compute this problematic secp256k1 multiplication', function() {
+    var curve = elliptic.curves.secp256k1.curve;
+    var g1 = curve.g; // precomputed g
+    assert(g1.precomputed);
+    var g2 = curve.point(g1.getX(), g1.getY()); // not precomputed g
+    assert(!g2.precomputed);
+    var a = new bn('6d1229a6b24c2e775c062870ad26bc261051e0198c67203167273c7c62538846', 16);
+    var p1 = g1.mul(a);
+    var p2 = g2.mul(a);
+    assert(p1.eq(p2));
+  });
+
   it('should not fail on secp256k1 regression', function() {
     var curve = elliptic.curves.secp256k1.curve;
     var k1 = new BN(
