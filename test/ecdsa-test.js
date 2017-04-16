@@ -128,6 +128,38 @@ describe('ECDSA', function() {
   test('p384');
   test('p521');
 
+  it('should generate the correct secp256k1 public keys', function() {
+
+    var knownKeys = [
+      {
+        priv: '6d1229a6b24c2e775c062870ad26bc261051e0198c67203167273c7c62538846',
+        pub: '03d6106302d2698d6a41e9c9a114269e7be7c6a0081317de444bb2980bf9265a01',
+        pubx: 'd6106302d2698d6a41e9c9a114269e7be7c6a0081317de444bb2980bf9265a01',
+        puby: 'e05fb262e64b108991a29979809fcef9d3e70cafceb3248c922c17d83d66bc9d'
+      },
+      {
+        priv: 'f2cc9d2b008927db94b89e04e2f6e70c180e547b3e5e564b06b8215d1c264b53',
+        pub: '03e275faa35bd1e88f5df6e8f9f6edb93bdf1d65f4915efc79fd7a726ec0c21700',
+        pubx: 'e275faa35bd1e88f5df6e8f9f6edb93bdf1d65f4915efc79fd7a726ec0c21700',
+        puby: '367216cb35b086e6686d69dddd822a8f4d52eb82ac5d9de18fdcd9bf44fa7df7'
+      }
+    ];
+
+    var curve = elliptic.curves.secp256k1;
+    assert(curve);
+
+    var ecdsa = new elliptic.ec(curve);
+
+    for(var i = 0; i < knownKeys.length; i++) {
+      var key = ecdsa.keyPair(knownKeys[i].priv);
+      var pub = key.getPublic(true, 'hex');
+      assert.equal(pub, knownKeys[i].pub);
+      assert.equal(key.pub.x.toString(16), knownKeys[i].pubx);
+      assert.equal(key.pub.y.toString(16), knownKeys[i].puby);
+    }
+
+  });
+
   describe('RFC6979 vector', function() {
     function test(opt) {
       opt.cases.forEach(function(c) {
