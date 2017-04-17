@@ -127,6 +127,31 @@ var signature = '70bed1...';
 console.log(key.verify(msgHash, signature));
 ```
 
+When there's a public key and signature, but no private key:
+
+```javascript
+var EC = require('elliptic').ec;
+
+// Message to check
+var msg = 'hello world';
+
+// Public key as '04 + x + y'
+var pub = '04bb1fab218202a9b9f15294085e194b56f56b6146ec7cedffb1430030ace1d84e4a6df38e82205972ef025000f6919fb10c361dcc58135ab6ae567286cdf83373';
+
+// Signature as 'r + s'
+var signature = '60aa1f6f342385f474362756229f0546dd31b0a7bcd79265b794c5b4713475a6fef09d69b44333ef90f1689e9825add920ed2e7e496170aea8cc45876271e827';
+
+// In case signature is 'r + s', you should convert the format first
+var m = signature.match(/[a-f\d]{64}/ig);
+signature = { r: m[0], s: m[1] }; // R, S
+
+// Create EC context
+var ec = new EC('p256');
+
+// Verify signature
+console.log(ec.verify(msg, signature, pub, 'hex'));
+```
+
 ### ECDH
 
 ```javascript
