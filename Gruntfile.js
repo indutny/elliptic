@@ -1,5 +1,7 @@
 module.exports = function(grunt) {
   grunt.initConfig({
+    pkg: grunt.file.readJSON('package.json'),
+
     browserify: {
       unittests: {
         files: {
@@ -164,6 +166,19 @@ module.exports = function(grunt) {
           'dist/elliptic.min.js' : [ 'dist/elliptic.js' ]
         }
       }
+    },
+    'string-replace': {
+      version: {
+        files: {
+          'dist/elliptic.js': 'dist/elliptic.js'
+        },
+        options: {
+          replacements: [{
+            pattern: /{{ VERSION }}/g,
+            replacement: '<%= pkg.version %>'
+          }]
+        }
+      }
     }
   });
 
@@ -172,6 +187,7 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-contrib-copy');
   grunt.loadNpmTasks('grunt-contrib-uglify');
   grunt.loadNpmTasks('grunt-mocha-istanbul');
+  grunt.loadNpmTasks('grunt-string-replace');
   grunt.loadNpmTasks('grunt-saucelabs');
 
   grunt.event.on('coverage', function(lcov, done){
@@ -183,7 +199,7 @@ module.exports = function(grunt) {
     });
   });
 
-  grunt.registerTask('dist', ['browserify', 'uglify']);
+  grunt.registerTask('dist', ['browserify', 'string-replace', 'uglify']);
   grunt.registerTask('coverage', ['browserify', 'copy:test', 'mocha_istanbul:coverage']);
   grunt.registerTask('coveralls', ['browserify', 'copy:test', 'mocha_istanbul:coveralls']);
   grunt.registerTask('saucelabs', ['browserify', 'copy:test', 'connect', 'saucelabs-mocha']);
