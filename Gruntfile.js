@@ -14,6 +14,9 @@ module.exports = function(grunt) {
           'dist/elliptic.js': [ 'lib/elliptic.js' ]
         },
         options: {
+          transform: [
+            "browserify-versionify"
+          ],
           browserifyOptions: {
             standalone: 'elliptic'
           }
