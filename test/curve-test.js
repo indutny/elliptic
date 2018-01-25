@@ -20,6 +20,44 @@ describe('Curve', function() {
     assert(p.dbl().add(p.dbl()).eq(p.add(p).add(p).add(p)));
   });
 
+  it('should dbl points on edwards curve using proj coordinates', function() {
+    var curve = new elliptic.curve.edwards({
+      p: new BN('97ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' +
+        'ffffffffffffffffffffffffffffffffff3f', 16, 'le'),
+      q: new BN('19973cfd137ee273272d101b28695e7ce1ee951ef221fbd5ffffffffff' +
+        'ffffffffffffffffffffffffffffffffffff0f', 16, 'le'),
+      r: '8',
+      a: '1',
+      c: '1',
+      // -67254 mod p
+      d: new BN('e1f8feffffffffffffffffffffffffffffffffffffffffffffffffff' +
+        'ffffffffffffffffffffffffffffffffffffff3f', 16, 'le'),
+      g: [
+        new BN('0396f77094ccc0eb985310e8bc7d519311846453b8ba232935640b2b0' +
+          '340f868ae208d6ee95bf0e59103b2ead08d6f19', 16, 'le'),
+        new BN('11', 16, 'le')
+      ]
+    });
+
+    var point = [
+      '21fd21b36cbdbe0d77ad8692c25d918774f5d3bc179c4cb0ae3c364bf1bea981d0' +
+      '2e9f97cc62f20acacf0c553887e5fb',
+      '29f994329799dba72aa12ceb06312300167b6e18fbed607c63709826c57292cf29' +
+      'f5bab4f5c99c739cf107a3833bb553'
+    ];
+
+    var double = [
+      '0561c8722cf82b2f0d7c36bc72e34539dcbf181e8d98f5244480e79f5b51a4a541' +
+      '457016c9c0509d49078eb5909a1121',
+      '05b7812fae9d164ee9249c56a16e29a1ad2cdc6353227074dd96d59df363a0bcb5' +
+      'bc67d50b44843ea833156bdc0ac6a2'
+    ];
+
+    var p = curve.pointFromJSON(point);
+    var d = curve.pointFromJSON(double);
+    assert(p.dbl().eq(d));
+  });
+
   it('should work with secp112k1', function() {
     var curve = new elliptic.curve.short({
       p: 'db7c 2abf62e3 5e668076 bead208b',
