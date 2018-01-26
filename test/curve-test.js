@@ -58,6 +58,34 @@ describe('Curve', function() {
     assert(p.dbl().eq(d));
   });
 
+  it('should be able to find a point given y coordinate for all edwards curves',
+    function() {
+    var curve = new elliptic.curve.edwards({
+      p: new BN('f7' +
+        'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff07',
+        16, 'le'),
+      q: new BN('71' +
+        'c966d15fd444893407d3dfc46579f7ffffffffffffffffffffffffffffff01',
+        16, 'le'),
+      r: '4',
+      a: '1',
+      // -1174 mod p
+      d: new BN('61' +
+        'fbffffffffffffffffffffffffffffffffffffffffffffffffffffffffff07',
+        16, 'le'),
+      c: '1'
+    });
+
+    var target = curve.point(
+      '05d040ddaa645bf27d2d2f302c5697231425185fd9a410f220ac5c5c7fbeb8a1',
+      '02f8ca771306cd23e929775177f2c213843a017a6487b2ec5f9b2a3808108ef2'
+    );
+
+    var point = curve.pointFromY('02' +
+      'f8ca771306cd23e929775177f2c213843a017a6487b2ec5f9b2a3808108ef2');
+    assert(point.eq(target));
+  });
+
   it('should work with secp112k1', function() {
     var curve = new elliptic.curve.short({
       p: 'db7c 2abf62e3 5e668076 bead208b',
