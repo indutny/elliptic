@@ -107,7 +107,7 @@ describe('Curve', function() {
     var y = new BN(bytes, 16, 'le');
     var point = curve.pointFromY(y, true);
     var target = '2cd591ae3789fd62dc420a152002f79973a387eacecadc6a9a00c1a89488c15d';
-    assert.deepStrictEqual(point.getX().toString(16), target);
+    assert.strictEqual(point.getX().toString(16), target);
   });
 
   it('should work with secp112k1', function() {
