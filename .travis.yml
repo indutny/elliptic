@@ -3,8 +3,6 @@ os:
   - linux
 language: node_js
 node_js:
-  - "4"
-  - "5"
   - "stable"
 env:
   global:
@@ -15,11 +13,11 @@ env:
     - TEST_SUITE='npm run unit'
 matrix:
   include:
-    - node_js: "4"
+    - node_js: "stable"
       env: TEST_SUITE='npm run lint'
-    - node_js: "4"
+    - node_js: "stable"
       env: TEST_SUITE='grunt coveralls'
-    - node_js: "4"
+    - node_js: "stable"
       env: TEST_SUITE='grunt saucelabs'
   allow_failures:
     - env: TEST_SUITE='grunt saucelabs'
