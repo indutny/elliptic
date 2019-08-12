@@ -83,9 +83,9 @@ describe('ECDSA', function() {
       });
 
       it('should load public key from compact hex value', function() {
-        var pub = keys.getPublic(true, 'hex');
+        var pub = keys.getPublic('hex', true);
         var copy = ecdsa.keyFromPublic(pub, 'hex');
-        assert.equal(copy.getPublic(true, 'hex'), pub);
+        assert.equal(copy.getPublic('hex', true), pub);
       });
 
       it('should load public key from hex value', function() {
