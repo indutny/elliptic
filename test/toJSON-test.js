@@ -12,7 +12,7 @@ function exportPoint (p) {
 }
 
 describe('toJSON <-> pointFromJSON symmetry', function() {
-  it('toJSON matches pointFromJSON', function () {
+  it('toJSON is the inverse of pointFromJSON', function () {
     for (var key in curves) {
       if (key === 'PresetCurve') continue;
 
