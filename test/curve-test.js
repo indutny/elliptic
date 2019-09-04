@@ -253,6 +253,13 @@ describe('Curve', function() {
     var neg2 = neg.neg(true);
     assert(p.eq(neg2));
   });
+
+  it('should correctly handle scalar multiplication of zero', function() {
+    var curve = elliptic.curves.secp256k1.curve;
+    var p1 = curve.g.mul('0');
+    var p2 = p1.mul('2');
+    assert(p1.eq(p2));
+  });
 });
 
 describe('Point codec', function () {
