@@ -1,5 +1,7 @@
 'use strict';
 
+require('./init');
+
 var assert = require('assert');
 var BN = require('bn.js');
 var elliptic = require('../');
