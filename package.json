@@ -32,7 +32,7 @@
   "homepage": "https://github.com/indutny/elliptic",
   "devDependencies": {
     "brfs": "^1.4.3",
-    "coveralls": "^3.0.4",
+    "coveralls": "^3.0.8",
     "grunt": "^1.0.4",
     "grunt-browserify": "^5.0.0",
     "grunt-cli": "^1.2.0",
@@ -43,8 +43,8 @@
     "grunt-saucelabs": "^9.0.1",
     "istanbul": "^0.4.2",
     "jscs": "^3.0.7",
-    "jshint": "^2.6.0",
-    "mocha": "^6.1.4"
+    "jshint": "^2.10.3",
+    "mocha": "^6.2.2"
   },
   "dependencies": {
     "bn.js": "^4.4.0",
