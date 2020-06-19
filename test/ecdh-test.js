@@ -1,3 +1,5 @@
+require('./init');
+
 var assert = require('assert');
 var elliptic = require('../');
 var hash = require('hash.js');

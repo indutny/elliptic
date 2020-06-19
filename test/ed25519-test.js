@@ -1,5 +1,7 @@
 'use strict';
 
+require('./init');
+
 var assert = require('assert');
 var elliptic = require('../');
 var utils = elliptic.utils;
