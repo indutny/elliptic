@@ -1,3 +1,4 @@
+/* eslint-env node, mocha */
 'use strict';
 
 var assert = require('assert');
@@ -30,7 +31,7 @@ describe('ed25519 derivations', function() {
       var key = ed25519.keyFromSecret(secret);
       assert.equal(toHex(key.privBytes()), test.a_hex);
       var xRecovered = toHex(ed25519.encodeInt(
-                             ed25519.decodePoint(key.pubBytes()).getX()));
+        ed25519.decodePoint(key.pubBytes()).getX()));
       assert.equal(xRecovered, test.A_P.x);
       assert.equal(toHex(key.pubBytes()), test.A_hex);
     });
@@ -72,8 +73,8 @@ describe('sign.input ed25519 test vectors', function() {
       assert(key.verify(msg, sig));
 
       var forged = msg.length === 0 ? [ 0x78 ] /*ord('x')*/:
-                   msg.slice(0, msg.length - 1).concat(
-                        (msg[(msg.length - 1)] + 1) % 256);
+        msg.slice(0, msg.length - 1).concat(
+          (msg[(msg.length - 1)] + 1) % 256);
 
       assert.equal(msg.length || 1, forged.length);
       assert(!key.verify(forged, sig));

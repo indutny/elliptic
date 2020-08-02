@@ -1,3 +1,4 @@
+/* eslint-env node, mocha */
 'use strict';
 
 var assert = require('assert');
@@ -9,7 +10,7 @@ describe('Curve', function() {
     var curve = new elliptic.curve.short({
       p: '1d',
       a: '4',
-      b: '14'
+      b: '14',
     });
 
     var p = curve.point('18', '16');
@@ -35,22 +36,22 @@ describe('Curve', function() {
       g: [
         new BN('0396f77094ccc0eb985310e8bc7d519311846453b8ba232935640b2b0' +
           '340f868ae208d6ee95bf0e59103b2ead08d6f19', 16, 'le'),
-        new BN('11', 16, 'le')
-      ]
+        new BN('11', 16, 'le'),
+      ],
     });
 
     var point = [
       '21fd21b36cbdbe0d77ad8692c25d918774f5d3bc179c4cb0ae3c364bf1bea981d0' +
       '2e9f97cc62f20acacf0c553887e5fb',
       '29f994329799dba72aa12ceb06312300167b6e18fbed607c63709826c57292cf29' +
-      'f5bab4f5c99c739cf107a3833bb553'
+      'f5bab4f5c99c739cf107a3833bb553',
     ];
 
     var double = [
       '0561c8722cf82b2f0d7c36bc72e34539dcbf181e8d98f5244480e79f5b51a4a541' +
       '457016c9c0509d49078eb5909a1121',
       '05b7812fae9d164ee9249c56a16e29a1ad2cdc6353227074dd96d59df363a0bcb5' +
-      'bc67d50b44843ea833156bdc0ac6a2'
+      'bc67d50b44843ea833156bdc0ac6a2',
     ];
 
     var p = curve.pointFromJSON(point);
@@ -60,31 +61,31 @@ describe('Curve', function() {
 
   it('should be able to find a point given y coordinate for all edwards curves',
     function() {
-    var curve = new elliptic.curve.edwards({
-      p: new BN('f7' +
+      var curve = new elliptic.curve.edwards({
+        p: new BN('f7' +
         'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff07',
         16, 'le'),
-      q: new BN('71' +
+        q: new BN('71' +
         'c966d15fd444893407d3dfc46579f7ffffffffffffffffffffffffffffff01',
         16, 'le'),
-      r: '4',
-      a: '1',
-      // -1174 mod p
-      d: new BN('61' +
+        r: '4',
+        a: '1',
+        // -1174 mod p
+        d: new BN('61' +
         'fbffffffffffffffffffffffffffffffffffffffffffffffffffffffffff07',
         16, 'le'),
-      c: '1'
-    });
+        c: '1',
+      });
 
-    var target = curve.point(
-      '05d040ddaa645bf27d2d2f302c5697231425185fd9a410f220ac5c5c7fbeb8a1',
-      '02f8ca771306cd23e929775177f2c213843a017a6487b2ec5f9b2a3808108ef2'
-    );
+      var target = curve.point(
+        '05d040ddaa645bf27d2d2f302c5697231425185fd9a410f220ac5c5c7fbeb8a1',
+        '02f8ca771306cd23e929775177f2c213843a017a6487b2ec5f9b2a3808108ef2',
+      );
 
-    var point = curve.pointFromY('02' +
+      var point = curve.pointFromY('02' +
       'f8ca771306cd23e929775177f2c213843a017a6487b2ec5f9b2a3808108ef2');
-    assert(point.eq(target));
-  });
+      assert(point.eq(target));
+    });
 
   it('should find an odd point given a y coordinate', function() {
     var curve = new elliptic.curve.edwards({
@@ -99,11 +100,11 @@ describe('Curve', function() {
         '216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51a',
 
         // 4/5
-        '6666666666666666666666666666666666666666666666666666666666666658'
-      ]
+        '6666666666666666666666666666666666666666666666666666666666666658',
+      ],
     });
 
-    var bytes = new Uint8Array([5, 69, 248, 173, 171, 254, 19, 253, 143, 140, 146, 174, 26, 128, 3, 52, 106, 55, 112, 245, 62, 127, 42, 93, 0, 81, 47, 177, 30, 25, 39, 70]);
+    var bytes = new Uint8Array([ 5, 69, 248, 173, 171, 254, 19, 253, 143, 140, 146, 174, 26, 128, 3, 52, 106, 55, 112, 245, 62, 127, 42, 93, 0, 81, 47, 177, 30, 25, 39, 70 ]);
     var y = new BN(bytes, 16, 'le');
     var point = curve.pointFromY(y, true);
     var target = '2cd591ae3789fd62dc420a152002f79973a387eacecadc6a9a00c1a89488c15d';
@@ -114,7 +115,7 @@ describe('Curve', function() {
     var curve = new elliptic.curve.short({
       p: 'db7c 2abf62e3 5e668076 bead208b',
       a: 'db7c 2abf62e3 5e668076 bead2088',
-      b: '659e f8ba0439 16eede89 11702b22'
+      b: '659e f8ba0439 16eede89 11702b22',
     });
 
     var p = curve.point(
@@ -134,13 +135,13 @@ describe('Curve', function() {
              'baaedce6 af48a03b bfd25e8c d0364141',
       g: [
         '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
-        '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
-      ]
+        '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8',
+      ],
     });
 
     var p = curve.point(
       '79be667e f9dcbbac 55a06295 ce870b07 029bfcdb 2dce28d9 59f2815b 16f81798',
-      '483ada77 26a3c465 5da4fbfc 0e1108a8 fd17b448 a6855419 9c47d08f fb10d4b8'
+      '483ada77 26a3c465 5da4fbfc 0e1108a8 fd17b448 a6855419 9c47d08f fb10d4b8',
     );
     assert(p.validate());
     assert(p.dbl().validate());
@@ -173,7 +174,7 @@ describe('Curve', function() {
     var g2 = curve.point(g1.getX(), g1.getY()); // not precomputed g
     assert(!g2.precomputed);
     var a = new BN(
-        '6d1229a6b24c2e775c062870ad26bc261051e0198c67203167273c7c62538846', 16);
+      '6d1229a6b24c2e775c062870ad26bc261051e0198c67203167273c7c62538846', 16);
     var p1 = g1.mul(a);
     var p2 = g2.mul(a);
     assert(p1.eq(p2));
@@ -187,9 +188,9 @@ describe('Curve', function() {
     assert(!g2.precomputed);
 
     var a = new BN(
-        '6d1229a6b24c2e775c062870ad26bc26' +
+      '6d1229a6b24c2e775c062870ad26bc26' +
             '1051e0198c67203167273c7c6253884612345678',
-        16);
+      16);
     var p1 = g1.mul(a);
     var p2 = g2.mul(a);
     assert(p1.eq(p2));
@@ -198,9 +199,9 @@ describe('Curve', function() {
   it('should not fail on secp256k1 regression', function() {
     var curve = elliptic.curves.secp256k1.curve;
     var k1 = new BN(
-        '32efeba414cd0c830aed727749e816a01c471831536fd2fce28c56b54f5a3bb1', 16);
+      '32efeba414cd0c830aed727749e816a01c471831536fd2fce28c56b54f5a3bb1', 16);
     var k2 = new BN(
-        '5f2e49b5d64e53f9811545434706cde4de528af97bfd49fde1f6cf792ee37a8c', 16);
+      '5f2e49b5d64e53f9811545434706cde4de528af97bfd49fde1f6cf792ee37a8c', 16);
 
     var p1 = curve.g.mul(k1);
     var p2 = curve.g.mul(k2);
@@ -225,13 +226,13 @@ describe('Curve', function() {
     var bad = {
       x: '026a2073b1ef6fab47ace18e60e728a05180a82755bbcec9a0abc08ad9f7a3d4',
       y: '9cd8cb48c3281596139f147c1364a3ede88d3f310fdb0eb98c924e599ca1b3c9',
-      z: 'd78587ad45e4102f48b54b5d85598296e069ce6085002e169c6bad78ddc6d9bd'
+      z: 'd78587ad45e4102f48b54b5d85598296e069ce6085002e169c6bad78ddc6d9bd',
     };
 
     var good = {
       x: 'e7789226739ac2eb3c7ccb2a9a910066beeed86cdb4e0f8a7fee8eeb29dc7016',
       y: '4b76b191fd6d47d07828ea965e275b76d0e3e0196cd5056d38384fbb819f9fcb',
-      z: 'cbf8d99056618ba132d6145b904eee1ce566e0feedb9595139c45f84e90cfa7d'
+      z: 'cbf8d99056618ba132d6145b904eee1ce566e0feedb9595139c45f84e90cfa7d',
     };
 
     var curve = elliptic.curves.secp256k1.curve;
@@ -297,7 +298,7 @@ describe('Point codec', function () {
   var shortPointEvenY = {
     coordinates: {
       x: '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
-      y: '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
+      y: '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8',
     },
     compactEncoded:
       '02' +
@@ -309,13 +310,13 @@ describe('Point codec', function () {
     hybrid:
       '06' +
       '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798' +
-      '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8'
+      '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8',
   };
 
   var shortPointOddY = {
     coordinates: {
       x: 'fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556',
-      y: 'ae12777aacfbb620f3be96017f45c560de80f0f6518fe4a03c870c36b075f297'
+      y: 'ae12777aacfbb620f3be96017f45c560de80f0f6518fe4a03c870c36b075f297',
     },
     compactEncoded:
       '03' +
@@ -327,7 +328,7 @@ describe('Point codec', function () {
     hybrid:
       '07' +
       'fff97bd5755eeea420453a14355235d382f6472f8568a18b2f057a1460297556' +
-      'ae12777aacfbb620f3be96017f45c560de80f0f6518fe4a03c870c36b075f297'
+      'ae12777aacfbb620f3be96017f45c560de80f0f6518fe4a03c870c36b075f297',
   };
 
   it('should throw when trying to decode random bytes', function() {
@@ -339,18 +340,18 @@ describe('Point codec', function () {
   });
 
   it('should be able to encode/decode a short curve point with even Y',
-      makeShortTest(shortPointEvenY));
+    makeShortTest(shortPointEvenY));
 
   it('should be able to encode/decode a short curve point with odd Y',
-      makeShortTest(shortPointOddY));
+    makeShortTest(shortPointOddY));
 
   it('should be able to encode/decode a mont curve point', makeMontTest({
     coordinates: {
       // curve25519.curve.g.mul(new BN('6')).getX().toString(16, 2)
       x: '26954ccdc99ebf34f8f1dde5e6bb080685fec73640494c28f9fe0bfa8c794531',
-      z: '1'
+      z: '1',
     },
     encoded:
-      '26954ccdc99ebf34f8f1dde5e6bb080685fec73640494c28f9fe0bfa8c794531'
+      '26954ccdc99ebf34f8f1dde5e6bb080685fec73640494c28f9fe0bfa8c794531',
   }));
 });

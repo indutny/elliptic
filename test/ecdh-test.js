@@ -1,6 +1,8 @@
+/* eslint-env node, mocha */
+'use strict';
+
 var assert = require('assert');
 var elliptic = require('../');
-var hash = require('hash.js');
 
 describe('ECDH', function() {
   function test(name) {
@@ -13,10 +15,10 @@ describe('ECDH', function() {
 
       assert.equal(sh1.toString(16), sh2.toString(16));
 
-      var sh1 = s1.derive(ecdh.keyFromPublic(s2.getPublic('hex'), 'hex')
-                              .getPublic());
-      var sh2 = s2.derive(ecdh.keyFromPublic(s1.getPublic('hex'), 'hex')
-                              .getPublic());
+      sh1 = s1.derive(ecdh.keyFromPublic(s2.getPublic('hex'), 'hex')
+        .getPublic());
+      sh2 = s2.derive(ecdh.keyFromPublic(s1.getPublic('hex'), 'hex')
+        .getPublic());
       assert.equal(sh1.toString(16), sh2.toString(16));
     });
   }

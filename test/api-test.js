@@ -1,3 +1,6 @@
+/* eslint-env node, mocha */
+'use strict';
+
 var assert = require('assert');
 var elliptic = require('../');
 
@@ -11,7 +14,7 @@ describe('EC API', function() {
 
   it('should throw error with invalid curve', function() {
     assert.throws(function() {
-      var ec = new elliptic.ec('nonexistent-curve');
+      new elliptic.ec('nonexistent-curve');
     }, Error);
   });
 });

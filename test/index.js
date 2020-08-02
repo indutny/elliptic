@@ -1,3 +1,6 @@
+/* eslint-env node, mocha */
+'use strict';
+
 describe('Test specs', function () {
   require('./api-test.js');
   require('./curve-test.js');
