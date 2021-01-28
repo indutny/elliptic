@@ -27,3 +27,17 @@ describe('ECDH', function() {
   test('ed25519');
   test('secp256k1');
 });
+
+describe('ECDH twist attack', () => {
+  it('should be able to prevent a twist attack for secp256k1', () => {
+    var bobEcdh = new elliptic.ec('secp256k1');
+    var malloryEcdh = new elliptic.ec('secp256k1');
+    var bob = bobEcdh.genKeyPair();
+    // This is a bad point that shouldn't be able to be passed to derive.
+    // If a bad point can be passed it's possible to perform a twist attack.
+    var mallory = malloryEcdh.keyFromPublic({ x: 14, y: 16 });
+    assert.throws(function () {
+      bob.derive(mallory.getPublic());
+    });
+  });
+});
