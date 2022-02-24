@@ -8,10 +8,10 @@ on:
 
 jobs:
   build:
-    runs-on: {{ matrix.run-env }}
+    runs-on: {{ matrix.runEnv }}
     strategy:
       matrix:
-        run-env: [ubuntu-latest, windows-latest, macOS-latest]
+        runEnv: [ubuntu-latest, windows-latest, macOS-latest]
     
     steps:
     - uses: actions/checkout@v2
