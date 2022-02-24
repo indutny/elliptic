@@ -1,0 +1,27 @@
+name: Build app with Grunt
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: {{ matrix.run-env }}
+    strategy:
+      matrix:
+        run-env: [ubuntu-latest, windows-latest, macOS-latest]
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Use Node.js 16.0.0
+      uses: actions/setup-node@v1
+      with:
+        node-version: 16.0.0
+
+    - name: Build
+      run: |
+        npm install
+        grunt dist
