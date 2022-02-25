@@ -46,4 +46,5 @@ jobs:
         run: npm install
 
       - name: Run checks
+        continue-on-error: true # these checks only check formatting styles, so allowed to fail
         run: ${{ matrix.checks }}
