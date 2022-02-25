@@ -25,4 +25,4 @@ jobs:
         run: npm install
 
       - name: Compile/Transpile JS
-        run: grunt dist
+        run: ./node_modules/grunt/bin/grunt dist
