@@ -46,17 +46,17 @@ Fastest is elliptic#ecdh
 ### ECDSA
 
 ```javascript
-var EC = require('elliptic').ec;
+var EC = require("elliptic").ec;
 
 // Create and initialize EC context
 // (better do it once and reuse it)
-var ec = new EC('secp256k1');
+var ec = new EC("secp256k1");
 
 // Generate keys
 var key = ec.genKeyPair();
 
 // Sign the message's hash (input must be an array, or a hex-string)
-var msgHash = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ];
+var msgHash = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 var signature = key.sign(msgHash);
 
 // Export DER encoded signature in Array
@@ -75,13 +75,13 @@ var y = pubPoint.getY();
 // 1) '04' + hex string of x + hex string of y; or
 // 2) object with two hex string properties (x and y); or
 // 3) object with two buffer properties (x and y)
-var pub = pubPoint.encode('hex');                                 // case 1
-var pub = { x: x.toString('hex'), y: y.toString('hex') };         // case 2
-var pub = { x: x.toBuffer(), y: y.toBuffer() };                   // case 3
+var pub = pubPoint.encode("hex"); // case 1
+var pub = { x: x.toString("hex"), y: y.toString("hex") }; // case 2
+var pub = { x: x.toBuffer(), y: y.toBuffer() }; // case 3
 var pub = { x: x.toArrayLike(Buffer), y: y.toArrayLike(Buffer) }; // case 3
 
 // Import public key
-var key = ec.keyFromPublic(pub, 'hex');
+var key = ec.keyFromPublic(pub, "hex");
 
 // Signature MUST be either:
 // 1) DER-encoded signature as hex-string; or
@@ -89,9 +89,9 @@ var key = ec.keyFromPublic(pub, 'hex');
 // 3) object with two hex-string properties (r and s); or
 // 4) object with two buffer properties (r and s)
 
-var signature = '3046022100...'; // case 1
-var signature = new Buffer('...'); // case 2
-var signature = { r: 'b1fc...', s: '9c42...' }; // case 3
+var signature = "3046022100..."; // case 1
+var signature = new Buffer("..."); // case 2
+var signature = { r: "b1fc...", s: "9c42..." }; // case 3
 
 // Verify signature
 console.log(key.verify(msgHash, signature));
@@ -100,17 +100,17 @@ console.log(key.verify(msgHash, signature));
 ### EdDSA
 
 ```javascript
-var EdDSA = require('elliptic').eddsa;
+var EdDSA = require("elliptic").eddsa;
 
 // Create and initialize EdDSA context
 // (better do it once and reuse it)
-var ec = new EdDSA('ed25519');
+var ec = new EdDSA("ed25519");
 
 // Create key pair from secret
-var key = ec.keyFromSecret('693e3c...'); // hex string, array or Buffer
+var key = ec.keyFromSecret("693e3c..."); // hex string, array or Buffer
 
 // Sign the message's hash (input must be an array, or a hex-string)
-var msgHash = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ];
+var msgHash = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 var signature = key.sign(msgHash).toHex();
 
 // Verify signature
@@ -119,19 +119,19 @@ console.log(key.verify(msgHash, signature));
 // CHECK WITH NO PRIVATE KEY
 
 // Import public key
-var pub = '0a1af638...';
-var key = ec.keyFromPublic(pub, 'hex');
+var pub = "0a1af638...";
+var key = ec.keyFromPublic(pub, "hex");
 
 // Verify signature
-var signature = '70bed1...';
+var signature = "70bed1...";
 console.log(key.verify(msgHash, signature));
 ```
 
 ### ECDH
 
 ```javascript
-var EC = require('elliptic').ec;
-var ec = new EC('curve25519');
+var EC = require("elliptic").ec;
+var ec = new EC("curve25519");
 
 // Generate keys
 var key1 = ec.genKeyPair();
@@ -140,31 +140,32 @@ var key2 = ec.genKeyPair();
 var shared1 = key1.derive(key2.getPublic());
 var shared2 = key2.derive(key1.getPublic());
 
-console.log('Both shared secrets are BN instances');
+console.log("Both shared secrets are BN instances");
 console.log(shared1.toString(16));
 console.log(shared2.toString(16));
 ```
 
 three and more members:
+
 ```javascript
-var EC = require('elliptic').ec;
-var ec = new EC('curve25519');
+var EC = require("elliptic").ec;
+var ec = new EC("curve25519");
 
 var A = ec.genKeyPair();
 var B = ec.genKeyPair();
 var C = ec.genKeyPair();
 
-var AB = A.getPublic().mul(B.getPrivate())
-var BC = B.getPublic().mul(C.getPrivate())
-var CA = C.getPublic().mul(A.getPrivate())
+var AB = A.getPublic().mul(B.getPrivate());
+var BC = B.getPublic().mul(C.getPrivate());
+var CA = C.getPublic().mul(A.getPrivate());
 
-var ABC = AB.mul(C.getPrivate())
-var BCA = BC.mul(A.getPrivate())
-var CAB = CA.mul(B.getPrivate())
+var ABC = AB.mul(C.getPrivate());
+var BCA = BC.mul(A.getPrivate());
+var CAB = CA.mul(B.getPrivate());
 
-console.log(ABC.getX().toString(16))
-console.log(BCA.getX().toString(16))
-console.log(CAB.getX().toString(16))
+console.log(ABC.getX().toString(16));
+console.log(BCA.getX().toString(16));
+console.log(CAB.getX().toString(16));
 ```
 
 NOTE: `.derive()` returns a [BN][1] instance.
@@ -173,21 +174,21 @@ NOTE: `.derive()` returns a [BN][1] instance.
 
 Elliptic.js support following curve types:
 
-* Short Weierstrass
-* Montgomery
-* Edwards
-* Twisted Edwards
+- Short Weierstrass
+- Montgomery
+- Edwards
+- Twisted Edwards
 
 Following curve 'presets' are embedded into the library:
 
-* `secp256k1`
-* `p192`
-* `p224`
-* `p256`
-* `p384`
-* `p521`
-* `curve25519`
-* `ed25519`
+- `secp256k1`
+- `p192`
+- `p224`
+- `p256`
+- `p384`
+- `p521`
+- `curve25519`
+- `ed25519`
 
 NOTE: That `curve25519` could not be used for ECDSA, use `ed25519` instead.
 
@@ -202,7 +203,7 @@ provided by [hash.js][2]
 
 ### Related projects
 
-* [eccrypto][3]: isomorphic implementation of ECDSA, ECDH and ECIES for both
+- [eccrypto][3]: isomorphic implementation of ECDSA, ECDH and ECIES for both
   browserify and node (uses `elliptic` for browser and [secp256k1-node][4] for
   node)
 
