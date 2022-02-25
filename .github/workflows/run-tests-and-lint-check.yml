@@ -46,5 +46,4 @@ jobs:
         run: npm install
 
       - name: Run checks
-        if: always()
         run: ${{ matrix.checks }}
