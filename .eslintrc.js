@@ -23,7 +23,6 @@ module.exports = {
     semi: ["error", "always"],
     "array-bracket-spacing": ["error", "always"],
     "brace-style": ["error"],
-    camelcase: ["error"],
     "comma-spacing": ["error"],
     "comma-style": ["error"],
     "eol-last": ["error"],
@@ -47,6 +46,7 @@ module.exports = {
     "comma-dangle": ["error", "always-multiline"],
   },
   settings: {
+    emitWarning: true,
     react: {
       version: "detect",
     },
