@@ -21,7 +21,8 @@ jobs:
         with:
           node-version: 16.0.0
 
-      - name: Build
-        run: |
-          npm install
-          grunt dist
+      - name: Install packages
+        run: npm install
+
+      - name: Compile/Transpile JS
+        run: ./node_modules/grunt/bin/grunt dist
