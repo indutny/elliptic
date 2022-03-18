@@ -183,7 +183,7 @@ module.exports = function (grunt) {
     });
   });
 
-  grunt.registerTask("dist", ["browserify", "uglify"]);
+  grunt.registerTask("dist", ["browserify"]);
   grunt.registerTask("coverage", [
     "browserify",
     "copy:test",
