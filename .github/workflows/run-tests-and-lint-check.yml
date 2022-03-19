@@ -1,0 +1,50 @@
+name: Run Tests and Lint checks
+
+on:
+  push:
+    branches: [master] # only run the check when the PR is merged
+
+jobs:
+  runTests:
+    runs-on: ${{ matrix.runEnv }}
+    strategy:
+      matrix:
+        runEnv: [ubuntu-latest, windows-latest, macOS-latest]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js 16.0.0
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16.0.0
+
+      - name: Install packages
+        run: npm install
+
+      - name: Run Tests
+        run: ./node_modules/grunt/bin/grunt coveralls
+
+  lint:
+    needs: runTests # if code is failing tests, lint and prettier don't matter
+    runs-on: ${{ matrix.runEnv }}
+    strategy:
+      matrix:
+        runEnv: [ubuntu-latest, windows-latest, macOS-latest]
+        checks:
+          [npx prettier --check ./, ./node_modules/eslint/bin/eslint.js ./]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js 16.0.0
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16.0.0
+
+      - name: Install packages
+        run: npm install
+
+      - name: Run checks
+        continue-on-error: true # these checks only check formatting styles, so allowed to fail
+        run: ${{ matrix.checks }}
