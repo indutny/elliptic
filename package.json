@@ -45,7 +45,7 @@
     "mocha": "^8.0.1"
   },
   "dependencies": {
-    "bn.js": "^4.11.9",
+    "bn.js": "^5.2.1",
     "brorand": "^1.1.0",
     "hash.js": "^1.0.0",
     "hmac-drbg": "^1.0.1",
