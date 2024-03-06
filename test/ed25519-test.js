@@ -111,6 +111,24 @@ describe('EDDSA(\'ed25519\')', function() {
     assert(key.verify(msg, sig));
   });
 
+  it('should throw when trying to decode invalid bytes (1)', function() {
+    assert.throws(function() {
+      ed25519.decodePoint('c2cb3cf3840aa9893e00ec77093d3d44dba7da840b51c48462072d58d8efd183');
+    });
+  });
+
+  it('should throw when trying to decode invalid bytes (2)', function() {
+    assert.throws(function() {
+      ed25519.decodePoint('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+    });
+  });
+
+  it('should throw when trying to decode invalid bytes (3)', function() {
+    assert.throws(function() {
+      ed25519.decodePoint('edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f');
+    });
+  });
+
   describe('KeyPair', function() {
     var pair;
     var secret = '00000000000000000000000000000000' +
