@@ -3790,12 +3790,15 @@ utils.encode = minUtils.encode;
 // Represent num in a w-NAF form
 function getNAF(num, w, bits) {
   var naf = new Array(Math.max(num.bitLength(), bits) + 1);
-  naf.fill(0);
+  var i;
+  for (i = 0; i < naf.length; i += 1) {
+    naf[i] = 0;
+  }
 
   var ws = 1 << (w + 1);
   var k = num.clone();
 
-  for (var i = 0; i < naf.length; i++) {
+  for (i = 0; i < naf.length; i++) {
     var z;
     var mod = k.andln(ws - 1);
     if (k.isOdd()) {
@@ -8850,7 +8853,7 @@ utils.encode = function encode(arr, enc) {
 },{}],35:[function(require,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "6.5.4",
+  "version": "6.5.5",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "files": [
