@@ -131,6 +131,7 @@ describe('ECDSA', function() {
   test('p256');
   test('p384');
   test('p521');
+  test('alt_bn128');
 
   describe('RFC6979 vector', function() {
     function test(opt) {
