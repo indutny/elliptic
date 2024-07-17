@@ -4,7 +4,7 @@
 
 Fast elliptic-curve cryptography in a plain javascript implementation.
 
-NOTE: Please take a look at http://safecurves.cr.yp.to/ before choosing a curve
+NOTE: Please take a look at https://safecurves.cr.yp.to/ before choosing a curve
 for your cryptography operations.
 
 ## Incentive
@@ -231,7 +231,7 @@ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-[0]: http://tools.ietf.org/html/rfc6979
+[0]: https://tools.ietf.org/html/rfc6979
 [1]: https://github.com/indutny/bn.js
 [2]: https://github.com/indutny/hash.js
 [3]: https://github.com/bitchan/eccrypto
