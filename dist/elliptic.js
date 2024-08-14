@@ -2580,6 +2580,10 @@ function getLength(buf, p) {
     return false;
   }
 
+  if(buf[p.place] === 0x00) {
+    return false;
+  }
+
   var val = 0;
   for (var i = 0, off = p.place; i < octetLen; i++, off++) {
     val <<= 8;
@@ -2628,6 +2632,9 @@ Signature.prototype._importDER = function _importDER(data, enc) {
   if (rlen === false) {
     return false;
   }
+  if ((data[p.place] & 128) !== 0) {
+    return false;
+  }
   var r = data.slice(p.place, rlen + p.place);
   p.place += rlen;
   if (data[p.place++] !== 0x02) {
@@ -2638,6 +2645,9 @@ Signature.prototype._importDER = function _importDER(data, enc) {
     return false;
   }
   if (data.length !== slen + p.place) {
+    return false;
+  }
+  if ((data[p.place] & 128) !== 0) {
     return false;
   }
   var s = data.slice(p.place, slen + p.place);
@@ -2951,6 +2961,7 @@ function Signature(eddsa, sig) {
     sig = parseBytes(sig);
 
   if (Array.isArray(sig)) {
+    assert(sig.length === eddsa.encodingLength * 2, 'Signature has invalid size');
     sig = {
       R: sig.slice(0, eddsa.encodingLength),
       S: sig.slice(eddsa.encodingLength),
@@ -8856,7 +8867,7 @@ utils.encode = function encode(arr, enc) {
 },{}],35:[function(require,module,exports){
 module.exports={
   "name": "elliptic",
-  "version": "6.5.6",
+  "version": "6.5.7",
   "description": "EC cryptography",
   "main": "lib/elliptic.js",
   "files": [
