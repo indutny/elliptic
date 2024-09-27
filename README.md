@@ -55,7 +55,7 @@ var ec = new EC('secp256k1');
 // Generate keys
 var key = ec.genKeyPair();
 
-// Sign the message's hash (input must be an array, or a hex-string)
+// Sign the message's hash (input must be a byte array, or a hex-string)
 var msgHash = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ];
 var signature = key.sign(msgHash);
 
@@ -95,6 +95,18 @@ var signature = { r: 'b1fc...', s: '9c42...' }; // case 3
 
 // Verify signature
 console.log(key.verify(msgHash, signature));
+
+// Recover public key from signature
+const BN = require("bn.js")
+
+function hexToDec(hex) {
+  return new BN(hex, 16).toString(10)
+}
+
+var recoveryId = ec.getKeyRecoveryParam(msgHash, signature, key.getPublic());
+
+// msgHash must be decimal number
+var recoveredPubKey =  ec.recoverPubKey(hexToDec(msgHash), signature, recoveryId);
 ```
 
 ### EdDSA
