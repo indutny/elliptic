@@ -13,6 +13,7 @@ var entropy = [
 ];
 
 var msg = 'deadbeef';
+var msgBitSize = 32;
 
 describe('ECDSA', function() {
   function test(name) {
@@ -48,40 +49,40 @@ describe('ECDSA', function() {
       });
 
       it('should sign and verify', function() {
-        var signature = ecdsa.sign(msg, keys);
-        assert(ecdsa.verify(msg, signature, keys), 'Normal verify');
+        var signature = ecdsa.sign(msg, msgBitSize, keys);
+        assert(ecdsa.verify(msg, msgBitSize, signature, keys), 'Normal verify');
       });
 
       it('should sign and verify using key\'s methods', function() {
-        var signature = keys.sign(msg);
-        assert(keys.verify(msg, signature), 'On-key verify');
+        var signature = keys.sign(msg, msgBitSize);
+        assert(keys.verify(msg, msgBitSize, signature), 'On-key verify');
       });
 
       it('should load private key from the hex value', function() {
         var copy = ecdsa.keyFromPrivate(keys.getPrivate('hex'), 'hex');
-        var signature = ecdsa.sign(msg, copy);
-        assert(ecdsa.verify(msg, signature, copy), 'hex-private verify');
+        var signature = ecdsa.sign(msg, msgBitSize, copy);
+        assert(ecdsa.verify(msg, msgBitSize, signature, copy), 'hex-private verify');
       });
 
       it('should have `signature.s <= keys.ec.nh`', function() {
         // key.sign(msg, options)
-        var sign = keys.sign('hello', { canonical: true });
+        var sign = keys.sign('hello', 32, { canonical: true });
         assert(sign.s.cmp(keys.ec.nh) <= 0);
       });
 
       it('should support `options.k`', function() {
-        var sign = keys.sign(msg, {
+        var sign = keys.sign(msg, msgBitSize, {
           k: function(iter) {
             assert(iter >= 0);
             return new BN(1358);
           },
         });
-        assert(ecdsa.verify(msg, sign, keys), 'custom-k verify');
+        assert(ecdsa.verify(msg, msgBitSize, sign, keys), 'custom-k verify');
       });
 
       it('should have another signature with pers', function () {
-        var sign1 = keys.sign(msg);
-        var sign2 = keys.sign(msg, { pers: '1234', persEnc: 'hex' });
+        var sign1 = keys.sign(msg, msgBitSize);
+        var sign2 = keys.sign(msg, msgBitSize, { pers: '1234', persEnc: 'hex' });
         assert.notEqual(sign1.r.toArray().concat(sign1.s.toArray()),
           sign2.r.toArray().concat(sign2.s.toArray()));
       });
@@ -99,30 +100,30 @@ describe('ECDSA', function() {
       });
 
       it('should support hex DER encoding of signatures', function() {
-        var signature = ecdsa.sign(msg, keys);
+        var signature = ecdsa.sign(msg, msgBitSize, keys);
         var dsign = signature.toDER('hex');
-        assert(ecdsa.verify(msg, dsign, keys), 'hex-DER encoded verify');
+        assert(ecdsa.verify(msg, msgBitSize, dsign, keys), 'hex-DER encoded verify');
       });
 
       it('should support DER encoding of signatures', function() {
-        var signature = ecdsa.sign(msg, keys);
+        var signature = ecdsa.sign(msg, msgBitSize, keys);
         var dsign = signature.toDER();
-        assert(ecdsa.verify(msg, dsign, keys), 'DER encoded verify');
+        assert(ecdsa.verify(msg, msgBitSize, dsign, keys), 'DER encoded verify');
       });
 
       it('should not verify signature with wrong public key', function() {
-        var signature = ecdsa.sign(msg, keys);
+        var signature = ecdsa.sign(msg, msgBitSize, keys);
 
         var wrong = ecdsa.genKeyPair();
-        assert(!ecdsa.verify(msg, signature, wrong), 'Wrong key verify');
+        assert(!ecdsa.verify(msg, msgBitSize, signature, wrong), 'Wrong key verify');
       });
 
       it('should not verify signature with wrong private key', function() {
-        var signature = ecdsa.sign(msg, keys);
+        var signature = ecdsa.sign(msg, msgBitSize, keys);
 
         var wrong = ecdsa.keyFromPrivate(keys.getPrivate('hex') +
                                          keys.getPrivate('hex'));
-        assert(!ecdsa.verify(msg, signature, wrong), 'Wrong key verify');
+        assert(!ecdsa.verify(msg, msgBitSize, signature, wrong), 'Wrong key verify');
       });
     });
   }
@@ -143,12 +144,12 @@ describe('ECDSA', function() {
                     'and hash ' + c.hash.name + ' on "' + c.message + '"';
         it(descr, function() {
           var dgst = c.hash().update(c.message).digest();
-          var sign = ecdsa.sign(dgst, opt.key);
+          var sign = ecdsa.sign(dgst, c.hash.outSize, opt.key);
           assert.equal(sign.r.toString(16), c.r);
           assert.equal(sign.s.toString(16), c.s);
           assert.ok(ecdsa.keyFromPublic(opt.pub).validate().result,
             'Invalid public key');
-          assert.ok(ecdsa.verify(dgst, sign, opt.pub),
+          assert.ok(ecdsa.verify(dgst, c.hash.outSize, sign, opt.pub),
             'Invalid signature');
         });
       });
@@ -444,7 +445,7 @@ describe('ECDSA', function() {
         var msg = vector.message;
         var sig = vector.sig;
 
-        var actual = ecdsa.verify(msg, sig, key);
+        var actual = ecdsa.verify(msg, msg.length * 4, sig, key);
         assert.equal(actual, vector.result);
       });
     });
@@ -468,7 +469,7 @@ describe('ECDSA', function() {
     var ec = new elliptic.ec('secp256k1');
     var key = ec.genKeyPair();
     var msg = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ];
-    var signature = key.sign(msg);
+    var signature = key.sign(msg, msg.length);
     var recid = ec.getKeyRecoveryParam(msg, signature, key.getPublic());
     var r =  ec.recoverPubKey(msg, signature, recid);
     assert(key.getPublic().eq(r), 'the keys should match');
@@ -488,6 +489,18 @@ describe('ECDSA', function() {
         }, 0);
       });
     });
+
+  it('Wycheproof special hash case', function() {
+    var curve = new elliptic.ec('p192');
+    var msg = '00000000690ed426ccf17803ebe2bd0884bcd58a1bb5e7477ead3645f356e7a9';
+    var sig = '303502186f20676c0d04fc40ea55d5702f798355787363a9'+
+              '1e97a7e50219009d1c8c171b2b02e7d791c204c17cea4cf5'+
+              '56a2034288885b';
+    var pub = '04cd35a0b18eeb8fcd87ff019780012828745f046e785deb'+
+              'a28150de1be6cb4376523006beff30ff09b4049125ced29723'
+    var pubKey = curve.keyFromPublic(pub, 'hex');
+    assert(pubKey.verify(msg, 256, sig) === true)
+  });
 
   describe('Signature', function () {
     it('recoveryParam is 0', function () {
