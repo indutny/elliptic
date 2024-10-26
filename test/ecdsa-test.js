@@ -489,6 +489,50 @@ describe('ECDSA', function() {
       });
     });
 
+  it('Wycheproof special hash case with hex', function() {
+    var curve = new elliptic.ec('p192');
+    var msg =
+      '00000000690ed426ccf17803ebe2bd0884bcd58a1bb5e7477ead3645f356e7a9';
+    var sig = '303502186f20676c0d04fc40ea55d5702f798355787363a9' +
+              '1e97a7e50219009d1c8c171b2b02e7d791c204c17cea4cf5' +
+              '56a2034288885b';
+    var pub = '04cd35a0b18eeb8fcd87ff019780012828745f046e785deb' +
+              'a28150de1be6cb4376523006beff30ff09b4049125ced29723';
+    var pubKey = curve.keyFromPublic(pub, 'hex');
+    assert(pubKey.verify(msg, sig) === true);
+  });
+
+  it('Wycheproof special hash case with Array', function() {
+    var curve = new elliptic.ec('p192');
+    var msg = [
+      0x00, 0x00, 0x00, 0x00, 0x69, 0x0e, 0xd4, 0x26, 0xcc, 0xf1, 0x78,
+      0x03, 0xeb, 0xe2, 0xbd, 0x08, 0x84, 0xbc, 0xd5, 0x8a, 0x1b, 0xb5,
+      0xe7, 0x47, 0x7e, 0xad, 0x36, 0x45, 0xf3, 0x56, 0xe7, 0xa9,
+    ];
+    var sig = '303502186f20676c0d04fc40ea55d5702f798355787363a9' +
+              '1e97a7e50219009d1c8c171b2b02e7d791c204c17cea4cf5' +
+              '56a2034288885b';
+    var pub = '04cd35a0b18eeb8fcd87ff019780012828745f046e785deb' +
+              'a28150de1be6cb4376523006beff30ff09b4049125ced29723';
+    var pubKey = curve.keyFromPublic(pub, 'hex');
+    assert(pubKey.verify(msg, sig) === true);
+  });
+
+  it('Wycheproof special hash case with BN', function() {
+    var curve = new elliptic.ec('p192');
+    var msg = new BN(
+      '00000000690ed426ccf17803ebe2bd0884bcd58a1bb5e7477ead3645f356e7a9',
+      16,
+    );
+    var sig = '303502186f20676c0d04fc40ea55d5702f798355787363a9' +
+              '1e97a7e50219009d1c8c171b2b02e7d791c204c17cea4cf5' +
+              '56a2034288885b';
+    var pub = '04cd35a0b18eeb8fcd87ff019780012828745f046e785deb' +
+              'a28150de1be6cb4376523006beff30ff09b4049125ced29723';
+    var pubKey = curve.keyFromPublic(pub, 'hex');
+    assert(pubKey.verify(msg, sig, { msgBitLength: 32 * 8 }) === true);
+  });
+
   describe('Signature', function () {
     it('recoveryParam is 0', function () {
       var sig = new Signature({ r: '00', s: '00', recoveryParam: 0 });
