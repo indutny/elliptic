@@ -188,6 +188,7 @@ Following curve 'presets' are embedded into the library:
 * `p521`
 * `curve25519`
 * `ed25519`
+* `alt_bn128`
 
 NOTE: That `curve25519` could not be used for ECDSA, use `ed25519` instead.
 
