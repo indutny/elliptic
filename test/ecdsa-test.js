@@ -65,7 +65,7 @@ describe('ECDSA', function() {
 
       it('should have `signature.s <= keys.ec.nh`', function() {
         // key.sign(msg, options)
-        var sign = keys.sign('hello', { canonical: true });
+        var sign = keys.sign(msg, { canonical: true });
         assert(sign.s.cmp(keys.ec.nh) <= 0);
       });
 
