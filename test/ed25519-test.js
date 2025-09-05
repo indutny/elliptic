@@ -136,3 +136,102 @@ describe('EDDSA(\'ed25519\')', function() {
     });
   });
 });
+
+describe('ed25519 canonicality, hash binding, and subgrep checks', function() {
+  var ed25519;
+  var BN = require('bn.js');
+
+  before(function() {
+    ed25519 = new eddsa('ed25519');
+  });
+
+  describe('decodePoint canonicality (RFC 8032 §5.1.3)', function() {
+    it('rejects non-32-byte encodings', function() {
+      var enc = ed25519.encodePoint(ed25519.g); // Array of 32 bytes
+
+      // Too short (31)
+      assert.throws(function() {
+        ed25519.decodePoint(enc.slice(0, 31));
+      });
+
+      // Too long (33)
+      assert.throws(function() {
+        ed25519.decodePoint(enc.concat([ 0 ]));
+      });
+    });
+
+    it('rejects encodings where y >= p (non-canonical)', function() {
+      var p = ed25519.curve.p;
+      var P = ed25519.g;
+      var enc = ed25519.encodePoint(P).slice(); // canonical
+
+      // Recover y (clear sign bit)
+      var yBytes = enc.slice();
+      yBytes[31] &= 0x7f;
+      var y = new BN(Buffer.from(yBytes), 'le');
+
+      // Make non-canonical y' = y + p
+      var yBad = y.add(p);
+      var bad = yBad.toArray('le', 32);
+
+      // Restore sign bit from actual x parity
+      bad[31] &= 0x7f;
+      bad[31] |= (P.getX().isOdd() ? 0x80 : 0);
+
+      // Should be rejected per RFC 8032 §5.1.3
+      assert.throws(function() {
+        ed25519.decodePoint(bad);
+      });
+    });
+  });
+
+  describe('verify(): bind hash to actual points', function() {
+    it('rejects mismatched Rencoded()/R (hash confusion)', function() {
+      // Public key: use base point for a simple valid pubkey
+      var Aenc = ed25519.encodePoint(ed25519.g);
+      var key = ed25519.keyFromPublic(Aenc);
+      var A = key.pub();
+
+      // Message as a plain Array (not Buffer)
+      var msg = [ 0x61, 0x74, 0x74, 0x61, 0x63, 0x6b ]; // "attack"
+
+      // Choose arbitrary Q (for hashing) and S
+      var Q = ed25519.g.mul(new BN(12345));
+      var Qenc = ed25519.encodePoint(Q);
+      var S = new BN(4242);
+
+      // h = H(Qenc, Aenc, msg)
+      var h = ed25519.hashInt(Qenc, key.pubBytes(), msg);
+
+      // R = [S]B - [h]A
+      var R = ed25519.g.mul(S).add(A.mul(h).neg());
+
+      // Make a legit Signature, then lie about Rencoded()
+      var sig = ed25519.makeSignature({ R: R, S: S });
+      sig.Rencoded = function() {
+        return Qenc;
+      }; // mismatch
+
+      // With the fix (re-encoding from points), this must fail
+      assert.strictEqual(ed25519.verify(msg, sig, key), false);
+    });
+  });
+
+  describe('verify(): enforce subgroup membership (cofactor 8)', function() {
+    it('rejects identity public key (small-order)', function() {
+      // Identity encoding on ed25519: (x=0,y=1) -> 0x01 + 31*0x00
+      var Aenc = new Array(32).fill(0);
+      Aenc[0] = 1;
+
+      // Forge: pick any S and set R = [S]B
+      var S = new BN(1337);
+      var R = ed25519.g.mul(S);
+
+      var sig = ed25519.makeSignature({ R: R, S: S });
+      var msg = [ 0x78 ]; // 'x'
+
+      // With subgroup checks, identity public key must be rejected
+      assert.strictEqual(ed25519.verify(msg, sig, Aenc), false);
+    });
+  });
+});
