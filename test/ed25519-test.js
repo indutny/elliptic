@@ -136,3 +136,191 @@ describe('EDDSA(\'ed25519\')', function() {
     });
   });
 });
+
+describe('ed25519 canonicality, hash binding, and subgrep checks', function() {
+  var ed25519;
+  var BN = require('bn.js');
+
+  before(function() {
+    ed25519 = new eddsa('ed25519');
+  });
+
+  describe('decodePoint canonicality (RFC 8032 §5.1.3)', function() {
+    it('rejects non-32-byte encodings', function() {
+      var enc = ed25519.encodePoint(ed25519.g); // Array of 32 bytes
+
+      // Too short (31)
+      assert.throws(function() {
+        ed25519.decodePoint(enc.slice(0, 31));
+      });
+
+      // Too long (33)
+      assert.throws(function() {
+        ed25519.decodePoint(enc.concat([ 0 ]));
+      });
+    });
+
+    it('rejects encodings where y >= p (non-canonical)', function() {
+      var p = ed25519.curve.p;
+      var P = ed25519.g;
+      var enc = ed25519.encodePoint(P).slice(); // canonical
+
+      // Recover y (clear sign bit)
+      var yBytes = enc.slice();
+      yBytes[31] &= 0x7f;
+      var y = new BN(Buffer.from(yBytes), 'le');
+
+      // Make non-canonical y' = y + p
+      var yBad = y.add(p);
+      var bad = yBad.toArray('le', 32);
+
+      // Restore sign bit from actual x parity
+      bad[31] &= 0x7f;
+      bad[31] |= (P.getX().isOdd() ? 0x80 : 0);
+
+      // Should be rejected per RFC 8032 §5.1.3
+      assert.throws(function() {
+        ed25519.decodePoint(bad);
+      });
+    });
+  });
+
+  describe('verify(): bind hash to actual points', function() {
+    it('rejects mismatched Rencoded()/R (hash confusion)', function() {
+      // Public key: use base point for a simple valid pubkey
+      var Aenc = ed25519.encodePoint(ed25519.g);
+      var key = ed25519.keyFromPublic(Aenc);
+      var A = key.pub();
+
+      // Message as a plain Array (not Buffer)
+      var msg = [ 0x61, 0x74, 0x74, 0x61, 0x63, 0x6b ]; // "attack"
+
+      // Choose arbitrary Q (for hashing) and S
+      var Q = ed25519.g.mul(new BN(12345));
+      var Qenc = ed25519.encodePoint(Q);
+      var S = new BN(4242);
+
+      // h = H(Qenc, Aenc, msg)
+      var h = ed25519.hashInt(Qenc, key.pubBytes(), msg);
+
+      // R = [S]B - [h]A
+      var R = ed25519.g.mul(S).add(A.mul(h).neg());
+
+      // Make a legit Signature, then lie about Rencoded()
+      var sig = ed25519.makeSignature({ R: R, S: S });
+      sig.Rencoded = function() {
+        return Qenc;
+      }; // mismatch
+
+      // With the fix (re-encoding from points), this must fail
+      assert.strictEqual(ed25519.verify(msg, sig, key), false);
+    });
+  });
+
+  describe('verify(): enforce subgroup membership (cofactor 8)', function() {
+    it('rejects identity public key (small-order)', function() {
+      // Identity encoding on ed25519: (x=0,y=1) -> 0x01 + 31*0x00
+      var Aenc = new Array(32).fill(0);
+      Aenc[0] = 1;
+
+      // Forge: pick any S and set R = [S]B
+      var S = new BN(1337);
+      var R = ed25519.g.mul(S);
+
+      var sig = ed25519.makeSignature({ R: R, S: S });
+      var msg = [ 0x78 ]; // 'x'
+
+      // With subgroup checks, identity public key must be rejected
+      assert.strictEqual(ed25519.verify(msg, sig, Aenc), false);
+    });
+  });
+});
+describe('ed25519 general invariants & ergonomics', function() {
+  var ed25519;
+  var BN = require('bn.js');
+
+  before(function() {
+    ed25519 = new eddsa('ed25519');
+  });
+
+  it('encodePoint/decodePoint round-trip over many multiples of basepoint', function() {
+    // Check a bunch of points: P == decode(encode(P))
+    for (let i = 1; i <= Math.min(500, MAX_PROGRAMMATIC); i++) {
+      const P = ed25519.g.mul(new BN(i));
+      const enc = ed25519.encodePoint(P);      // Array
+      const dec = ed25519.decodePoint(enc);    // Point
+      assert(dec.eq(P), 'round-trip failed at i=' + i);
+    }
+  });
+
+  it('deterministic signatures for the same (key, message)', function() {
+    const secretHex = '000102030405060708090A0B0C0D0E0F' +
+                      '101112131415161718191A1B1C1D1E1F';
+    const key = ed25519.keyFromSecret(secretHex);
+    const msg = elliptic.utils.toArray('DEADBEEF', 'hex');
+
+    const sig1 = key.sign(msg).toHex();
+    const sig2 = key.sign(msg).toHex();
+    assert.strictEqual(sig1, sig2, 'signatures should be identical for same (key,msg)');
+
+    const msg2 = elliptic.utils.toArray('DEADBEEF00', 'hex');
+    const sig3 = key.sign(msg2).toHex();
+    assert.notStrictEqual(sig1, sig3, 'different msg should change signature');
+  });
+
+  it('accepts message as Array, Buffer, Uint8Array, and hex string (same signature)', function() {
+    const secretHex = '0'.repeat(64);
+    const key = ed25519.keyFromSecret(secretHex);
+
+    const arr = [ 0xde, 0xad, 0xbe, 0xef ];
+    const buf = Buffer.from(arr);
+    const u8  = new Uint8Array(arr);
+    const hex = 'DEADBEEF';
+
+    const s1 = key.sign(arr).toHex();
+    const s2 = key.sign(buf).toHex();
+    const s3 = key.sign(u8).toHex();
+    const s4 = key.sign(hex).toHex();
+
+    assert.strictEqual(s1, s2);
+    assert.strictEqual(s1, s3);
+    assert.strictEqual(s1, s4);
+  });
+
+  it('can sign/verify very long messages (1 MiB)', function() {
+    const key = ed25519.keyFromSecret('1'.repeat(64));
+    const n = 1024 * 1024;
+    const msg = new Array(n);
+    for (let i = 0; i < n; i++) msg[i] = i & 0xff;
+
+    const sig = key.sign(msg);
+    assert(key.verify(msg, sig), 'verification should succeed for long message');
+  }).timeout(8000);
+
+  it('private scalar clamping bits are set/cleared correctly', function() {
+    // RFC 8032 clamping: clear bits 0..2 of byte 0; clear bit 7 of byte 31; set bit 6 of byte 31.
+    const key = ed25519.keyFromSecret('2'.repeat(64));
+    const aBytes = key.privBytes(); // little-endian 32-byte scalar "a"
+
+    assert.strictEqual(aBytes.length, 32);
+    // Low three bits of the first byte cleared
+    assert.strictEqual(aBytes[0] & 0x07, 0, 'low 3 bits of a[0] must be 0');
+    // Highest bit of last byte cleared
+    assert.strictEqual(aBytes[31] & 0x80, 0, 'highest bit of a[31] must be 0');
+    // Next-highest bit of last byte set
+    assert.strictEqual(aBytes[31] & 0x40, 0x40, 'bit 6 of a[31] must be 1');
+  });
+
+  it('keyFromPublic accepts hex and Array; Buffer compat via Array.from', function() {
+    const sk = ed25519.keyFromSecret('3'.repeat(64));
+    const pubHex = elliptic.utils.toHex(sk.pubBytes());
+
+    const kHex = ed25519.keyFromPublic(pubHex); // hex ok
+    const kArr = ed25519.keyFromPublic(elliptic.utils.toArray(pubHex, 'hex'));
+    const kBuf = ed25519.keyFromPublic(Array.from(Buffer.from(pubHex, 'hex')));
+
+    assert(kHex.pub().eq(sk.pub()));
+    assert(kArr.pub().eq(sk.pub()));
+    assert(kBuf.pub().eq(sk.pub()));
+  });
+});
