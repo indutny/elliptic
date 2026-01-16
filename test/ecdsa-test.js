@@ -544,4 +544,41 @@ describe('ECDSA', function() {
       assert.equal(sig.recoveryParam, 1);
     });
   });
+
+  describe('Leading zero k value handling', function() {
+    it('should correctly sign when k has leading zeros', function() {
+      var ec = new elliptic.ec('secp256k1');
+      var key = ec.genKeyPair({ entropy: entropy });
+
+      // Create k with leading zeros - this tests the fix
+      var leadingZeroK = new Array(32);
+      leadingZeroK[0] = 0x00;
+      leadingZeroK[1] = 0x00;
+      for (var i = 2; i < 32; i++) {
+        leadingZeroK[i] = 0x42 + i;
+      }
+
+      var sign = key.sign('test message', {
+        k: function(iter) {
+          if (iter === 0) return new BN(leadingZeroK);
+          return new BN(1358);
+        },
+      });
+
+      assert(ec.verify('test message', sign, key));
+    });
+
+    it('should produce deterministic signatures with potential leading zero k', function() {
+      var ec = new elliptic.ec('secp256k1');
+      var key = ec.keyFromPrivate(
+        'c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721',
+      );
+
+      var sign1 = key.sign('sample');
+      var sign2 = key.sign('sample');
+
+      assert.equal(sign1.r.toString(16), sign2.r.toString(16));
+      assert.equal(sign1.s.toString(16), sign2.s.toString(16));
+    });
+  });
 });
