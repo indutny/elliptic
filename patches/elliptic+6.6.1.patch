@@ -1,0 +1,13 @@
+diff --git a/node_modules/elliptic/lib/elliptic/ec/index.js b/node_modules/elliptic/lib/elliptic/ec/index.js
+index a3fe37e..a25a79f 100644
+--- a/node_modules/elliptic/lib/elliptic/ec/index.js
++++ b/node_modules/elliptic/lib/elliptic/ec/index.js
+@@ -154,7 +154,7 @@ EC.prototype.sign = function sign(msg, key, enc, options) {
+     var k = options.k ?
+       options.k(iter) :
+       new BN(drbg.generate(this.n.byteLength()));
+-    k = this._truncateToN(k, true);
++    k = this._truncateToN(k, true, this.n.byteLength() * 8);
+     if (k.cmpn(1) <= 0 || k.cmp(ns1) >= 0)
+       continue;
+ 
